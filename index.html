@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#08080a" />
-<title>SWORDWOUND</title>
+<title>FloRod</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -35,7 +35,6 @@
     position: relative;
   }
 
-  /* arka plan dokusu */
   body::before {
     content: '';
     position: fixed;
@@ -61,7 +60,6 @@
     z-index: 0;
   }
 
-  /* ---------- SAHNE ---------- */
   .stage {
     position: relative;
     z-index: 1;
@@ -73,7 +71,6 @@
     justify-content: center;
     padding: 24px;
     text-align: center;
-    gap: 0;
   }
 
   .tag {
@@ -91,7 +88,7 @@
   .title {
     font-family: var(--font-head);
     font-weight: 900;
-    font-size: clamp(3rem, 13vw, 7.5rem);
+    font-size: clamp(3rem, 14vw, 8rem);
     line-height: 0.92;
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -113,7 +110,6 @@
     animation: rise 0.9s 0.16s ease both;
   }
 
-  /* ---------- PLAY BUTONU ---------- */
   .play-wrap {
     margin-top: clamp(48px, 8vh, 84px);
     animation: rise 0.9s 0.28s ease both;
@@ -137,7 +133,6 @@
     cursor: pointer;
     clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
     transition: background 0.25s, transform 0.15s, box-shadow 0.3s;
-    box-shadow: 0 0 0 rgba(176,37,37,0);
     -webkit-tap-highlight-color: transparent;
     user-select: none;
   }
@@ -168,7 +163,6 @@
 
   .play:hover .arrow { transform: translateX(5px); }
 
-  /* ---------- ALT BİLGİ ---------- */
   .foot {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -192,7 +186,6 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* ekran geçişi (play'e basınca) */
   .fade-out {
     position: fixed;
     inset: 0;
@@ -214,7 +207,6 @@
     .foot { font-size: 0.55rem; letter-spacing: 1.5px; }
   }
 
-  /* yatay ekran / kısa yükseklik */
   @media (max-height: 520px) {
     .tag { margin-bottom: 20px; }
     .play-wrap { margin-top: 32px; }
@@ -227,7 +219,7 @@
 <div class="stage">
   <span class="tag">Erken Erişim</span>
 
-  <h1 class="title">SWORD<em>WOUND</em></h1>
+  <h1 class="title">Flo<em>Rod</em></h1>
   <p class="subtitle">Çeliğin Ağırlığı</p>
 
   <div class="play-wrap">
@@ -238,7 +230,7 @@
 </div>
 
 <div class="foot">
-  <span>© 2026 SWORDWOUND</span>
+  <span>© 2026 FloRod</span>
   <span id="ver">v0.1</span>
 </div>
 
@@ -249,13 +241,11 @@
   const fadeOut = document.getElementById('fadeOut');
 
   playBtn.addEventListener('click', () => {
-    // ekran kararır, sonra oyun sahnesine geçilir
     fadeOut.classList.add('on');
 
     setTimeout(() => {
-      // şimdilik placeholder — oyun sahnesi buraya gelecek
       fadeOut.classList.remove('on');
-      // örnek: window.location.href = 'game.html';
+      // oyun sahnesi buraya gelecek
       alert('Oyun sahnesi buraya gelecek.');
     }, 700);
   });
