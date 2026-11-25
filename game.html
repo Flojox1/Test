@@ -3,338 +3,270 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#08080a" />
-<title>FloRod — Flo Diyarı</title>
+<meta name="theme-color" content="#0a0c08" />
+<title>FloRod — Mantar Çiftliği</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #08080a; --surface: #101014; --surface-2: #17171d;
-    --text: #e6e2d8; --muted: #7d7a72; --border: #232329;
-    --kenar: #4a7a3a; --merkez: #c99a2e; --sanayi: #7a7a82; --magara: #7a4a9a;
-    --accent: #b02525;
+    --bg: #0a0c08; --surface: #121610; --surface-2: #1a2018;
+    --text: #e6e8df; --muted: #7d8574; --border: #2a3226;
+    --green: #6aa84f; --green-bright: #8bc34a; --gold: #e8c56a;
+    --danger: #b02525; --danger-bright: #d63a3a;
     --font-head: 'Cinzel', serif; --font-body: 'Inter', sans-serif;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
   body {
     background: var(--bg); color: var(--text); font-family: var(--font-body);
     -webkit-font-smoothing: antialiased; overflow: hidden;
-    display: flex; flex-direction: column; height: 100dvh;
+    display:flex; flex-direction:column; height:100dvh;
   }
 
   /* HUD */
   .hud {
-    flex-shrink: 0; display: flex; align-items: center; gap: 8px;
-    padding: 10px 14px; padding-top: calc(10px + env(safe-area-inset-top));
-    border-bottom: 1px solid var(--border);
-    background: rgba(16,16,20,0.95); z-index: 5;
+    flex-shrink:0; display:flex; align-items:center; gap:6px;
+    padding:8px 10px; padding-top:calc(8px + env(safe-area-inset-top));
+    border-bottom:1px solid var(--border); background:rgba(18,22,16,0.97); z-index:5;
+    overflow-x:auto; -webkit-overflow-scrolling:touch;
   }
   .stat {
-    display: flex; flex-direction: column; padding: 4px 10px;
-    border-radius: 4px; background: var(--surface-2);
-    min-width: 0; flex: 1; max-width: 140px;
+    display:flex; flex-direction:column; padding:3px 8px;
+    border-radius:4px; background:var(--surface-2); flex-shrink:0;
   }
-  .stat .lbl {
-    font-size: 0.55rem; letter-spacing: 2px; text-transform: uppercase;
-    color: var(--muted); font-weight: 600;
+  .stat .lbl { font-size:0.5rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .stat .val { font-family:var(--font-head); font-size:0.85rem; font-weight:700; white-space:nowrap; }
+  .val.gold { color:var(--gold); }
+  .val.green { color:var(--green-bright); }
+  .val.danger { color:var(--danger-bright); }
+  .hud-spacer { flex:1; min-width:4px; }
+  #resetBtn {
+    flex-shrink:0; padding:7px 10px; background:transparent; color:var(--muted);
+    border:1px solid var(--border); border-radius:4px; font-family:var(--font-body);
+    font-size:0.62rem; letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
   }
-  .stat .val {
-    font-family: var(--font-head); font-size: 0.95rem; font-weight: 700;
-    color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .stat .val.gold { color: #e8c56a; }
-  .stat .val.green { color: #7ac07a; }
-  .hud-spacer { flex: 1; }
-  .hud-btn {
-    flex-shrink: 0; padding: 8px 12px; background: transparent;
-    color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
-    font-family: var(--font-body); font-size: 0.7rem; letter-spacing: 1px;
-    text-transform: uppercase; cursor: pointer;
-    transition: color 0.2s, border-color 0.2s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .hud-btn:hover { color: var(--accent); border-color: var(--accent); }
+  #resetBtn:hover { color:var(--danger-bright); border-color:var(--danger); }
 
-  /* LEGEND */
-  .legend {
-    flex-shrink: 0; display: flex; justify-content: center; flex-wrap: wrap;
-    gap: 6px; padding: 8px 12px; font-size: 0.6rem;
-    letter-spacing: 1.5px; text-transform: uppercase;
-    color: var(--muted); border-bottom: 1px solid var(--border);
+  /* TABS */
+  .tabs {
+    flex-shrink:0; display:flex; border-bottom:1px solid var(--border);
+    background:var(--surface); overflow-x:auto; -webkit-overflow-scrolling:touch;
   }
-  .legend span {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 8px; border-radius: 3px; background: var(--surface-2);
+  .tab {
+    flex:1; min-width:80px; padding:11px 8px; background:transparent;
+    color:var(--muted); border:none; border-bottom:2px solid transparent;
+    font-family:var(--font-body); font-size:0.68rem; font-weight:600;
+    letter-spacing:1.5px; text-transform:uppercase; cursor:pointer;
+    -webkit-tap-highlight-color:transparent; white-space:nowrap;
+    transition:color 0.2s, border-color 0.2s;
   }
-  .legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .tab.active { color:var(--green-bright); border-bottom-color:var(--green-bright); }
+  .tab:hover { color:var(--text); }
 
-  /* MAP */
-  .map-wrap {
-    flex: 1; min-height: 0; display: flex;
-    align-items: center; justify-content: center;
-    padding: 12px; overflow: hidden;
+  /* CONTENT */
+  .content { flex:1; min-height:0; overflow-y:auto; padding:12px; -webkit-overflow-scrolling:touch; }
+
+  .section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:8px; }
+  .section-head h2 { font-family:var(--font-head); font-size:1rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+  .btn {
+    padding:10px 16px; border-radius:4px; border:none; font-family:var(--font-body);
+    font-size:0.72rem; font-weight:600; letter-spacing:1px; text-transform:uppercase;
+    cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background 0.2s, transform 0.1s;
   }
-  .map {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    gap: 3px; width: min(100%, 720px); aspect-ratio: 12 / 8; max-height: 100%;
+  .btn:active { transform:scale(0.97); }
+  .btn-green { background:var(--green); color:#0a0c08; }
+  .btn-green:hover { background:var(--green-bright); }
+  .btn-ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+  .btn-ghost:hover { border-color:var(--muted); }
+  .btn-danger { background:var(--danger); color:#fff; }
+  .btn-danger:hover { background:var(--danger-bright); }
+  .btn:disabled { opacity:0.35; cursor:not-allowed; }
+
+  .hint {
+    background:var(--surface-2); border-left:3px solid var(--green);
+    padding:10px 12px; border-radius:4px; font-size:0.74rem; color:var(--muted);
+    line-height:1.5; margin-bottom:12px;
   }
-  .cell {
-    position: relative; border-radius: 3px; background: var(--surface-2);
-    border: 1px solid var(--border); cursor: pointer;
-    transition: transform 0.12s, box-shadow 0.2s, background 0.2s;
-    -webkit-tap-highlight-color: transparent; overflow: hidden;
-    display: flex; align-items: center; justify-content: center;
-    font-size: clamp(0.8rem, 3vw, 1.4rem);
+  .hint b { color:var(--text); }
+
+  /* BATCH */
+  .batch {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:5px; padding:12px; margin-bottom:10px;
   }
-  .cell:hover { transform: scale(1.06); z-index: 2; }
-  .cell:active { transform: scale(0.96); }
-  .cell.kenar  { background: rgba(74,122,58,0.12);  border-color: rgba(74,122,58,0.35); }
-  .cell.merkez { background: rgba(201,154,46,0.12); border-color: rgba(201,154,46,0.35); }
-  .cell.sanayi { background: rgba(122,122,130,0.12); border-color: rgba(122,122,130,0.35); }
-  .cell.magara { background: rgba(122,74,154,0.12); border-color: rgba(122,74,154,0.35); }
-  .cell.owned { background: var(--surface); border-width: 2px; }
-  .cell.owned.kenar  { border-color: var(--kenar);  box-shadow: inset 0 0 8px rgba(74,122,58,0.4); }
-  .cell.owned.merkez { border-color: var(--merkez); box-shadow: inset 0 0 8px rgba(201,154,46,0.4); }
-  .cell.owned.sanayi { border-color: var(--sanayi); box-shadow: inset 0 0 8px rgba(122,122,130,0.4); }
-  .cell.owned.magara { border-color: var(--magara); box-shadow: inset 0 0 8px rgba(122,74,154,0.4); }
-  .cell .lvl {
-    position: absolute; bottom: 1px; right: 2px;
-    font-size: 0.55rem; font-weight: 700; color: var(--text);
-    background: rgba(0,0,0,0.7); padding: 0 3px; border-radius: 2px;
-    letter-spacing: 0.5px;
+  .batch.contaminated { border-color:var(--danger); }
+  .batch.ready { border-color:var(--green-bright); box-shadow:0 0 16px rgba(139,195,74,0.12); }
+  .batch-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px; }
+  .batch-head .title { font-family:var(--font-head); font-size:0.82rem; font-weight:700; letter-spacing:0.5px; }
+  .batch-head .phase { font-size:0.6rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--green-bright); font-weight:600; }
+  .batch-head .phase.bad { color:var(--danger-bright); }
+  .bar { height:6px; background:var(--surface-2); border-radius:3px; overflow:hidden; margin:6px 0; }
+  .bar .fill { height:100%; background:var(--green); border-radius:3px; transition:width 0.4s linear; }
+  .bar .fill.bad { background:var(--danger); }
+  .batch-info { display:flex; justify-content:space-between; font-size:0.62rem; color:var(--muted); margin-bottom:8px; gap:8px; }
+  .batch-log { font-size:0.68rem; color:var(--muted); line-height:1.45; margin-bottom:8px; }
+  .batch-actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .batch-actions .btn { padding:8px 12px; font-size:0.64rem; }
+
+  /* MARKET */
+  .mat-list { display:flex; flex-direction:column; gap:8px; }
+  .mat {
+    display:flex; align-items:center; gap:10px; background:var(--surface);
+    border:1px solid var(--border); border-radius:5px; padding:10px 12px;
   }
+  .mat .ico { font-size:1.4rem; flex-shrink:0; }
+  .mat .info { flex:1; min-width:0; }
+  .mat .info .name { font-family:var(--font-head); font-size:0.82rem; font-weight:700; }
+  .mat .info .sub { font-size:0.62rem; color:var(--muted); }
+  .mat .own { font-family:var(--font-head); font-size:0.8rem; color:var(--green-bright); font-weight:700; white-space:nowrap; }
+  .buy-btns { display:flex; gap:4px; flex-shrink:0; }
+  .buy-btns .btn { padding:7px 9px; font-size:0.62rem; }
+
+  .sell-box {
+    background:var(--surface); border:1px solid var(--border); border-radius:5px;
+    padding:14px; margin-top:14px;
+  }
+  .sell-box h3 { font-family:var(--font-head); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .sell-row { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .sell-row .big { font-family:var(--font-head); font-size:1.2rem; color:var(--gold); font-weight:700; }
+
+  /* CONTAINER */
+  .container-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    padding:16px; margin-bottom:14px;
+  }
+  .container-card h3 { font-family:var(--font-head); font-size:1.1rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  .container-card .lvl { font-size:0.66rem; letter-spacing:2px; text-transform:uppercase; color:var(--green-bright); margin-bottom:12px; display:block; }
+  .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+  .stat-cell { background:var(--surface-2); padding:8px 10px; border-radius:4px; }
+  .stat-cell .k { font-size:0.55rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .stat-cell .v { font-family:var(--font-head); font-size:0.9rem; font-weight:700; }
+  .upgrade-box { background:var(--surface-2); border:1px dashed var(--border); border-radius:5px; padding:14px; }
+  .upgrade-box h4 { font-family:var(--font-head); font-size:0.9rem; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+  .upgrade-box p { font-size:0.72rem; color:var(--muted); line-height:1.5; margin-bottom:10px; }
+  .upgrade-box .cost { font-family:var(--font-head); color:var(--gold); font-weight:700; font-size:0.95rem; margin-bottom:10px; }
+
+  /* STORAGE */
+  .storage-bar { height:10px; background:var(--surface-2); border-radius:5px; overflow:hidden; margin:8px 0 14px; }
+  .storage-bar .fill { height:100%; background:var(--gold); border-radius:5px; transition:width 0.3s; }
 
   /* MODAL */
   .modal-back {
-    position: fixed; inset: 0; z-index: 20;
-    background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
-    display: none; align-items: center; justify-content: center; padding: 20px;
+    position:fixed; inset:0; z-index:30; background:rgba(0,0,0,0.8);
+    backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; padding:16px;
   }
-  .modal-back.on { display: flex; }
+  .modal-back.on { display:flex; }
   .modal {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 6px; padding: 26px 22px; width: 100%; max-width: 420px;
-    max-height: 90vh; overflow-y: auto; animation: pop 0.2s ease both;
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    padding:22px 18px; width:100%; max-width:440px; max-height:90vh; overflow-y:auto;
+    animation:pop 0.2s ease both;
   }
-  @keyframes pop {
-    from { opacity: 0; transform: scale(0.94); }
-    to { opacity: 1; transform: scale(1); }
+  @keyframes pop { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+  .modal h2 { font-family:var(--font-head); font-size:1.05rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  .modal .sub { font-size:0.64rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; display:block; }
+  .recipe {
+    background:var(--surface-2); border-radius:4px; padding:10px 12px;
+    font-size:0.72rem; color:var(--muted); line-height:1.7; margin-bottom:14px;
   }
-  .modal h2 {
-    font-family: var(--font-head); font-size: 1.2rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
+  .recipe b { color:var(--text); }
+  .method {
+    display:flex; align-items:center; gap:10px; background:var(--surface-2);
+    border:1px solid var(--border); border-radius:5px; padding:12px; margin-bottom:8px;
+    cursor:pointer; transition:border-color 0.2s; -webkit-tap-highlight-color:transparent;
   }
-  .modal .zone-name {
-    font-size: 0.66rem; letter-spacing: 3px; text-transform: uppercase;
-    color: var(--muted); margin-bottom: 18px; display: block;
-  }
-  .modal .balance { font-size: 0.8rem; color: var(--muted); margin-bottom: 18px; }
-  .modal .balance b { color: #e8c56a; font-family: var(--font-head); }
-  .option {
-    display: flex; align-items: center; gap: 12px;
-    padding: 14px; background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: 4px; margin-bottom: 8px; cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .option:hover { border-color: var(--accent); background: var(--surface); }
-  .option.disabled { opacity: 0.4; cursor: not-allowed; }
-  .option.disabled:hover { border-color: var(--border); background: var(--surface-2); }
-  .option .ico { font-size: 1.6rem; flex-shrink: 0; }
-  .option .info { flex: 1; min-width: 0; }
-  .option .info .name {
-    font-family: var(--font-head); font-weight: 700; font-size: 0.95rem;
-    text-transform: uppercase; letter-spacing: 0.5px; display: block;
-  }
-  .option .info .desc { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
-  .option .info .desc b { color: #7ac07a; }
-  .option .price {
-    font-family: var(--font-head); font-weight: 700; font-size: 0.9rem;
-    color: #e8c56a; white-space: nowrap;
-  }
-  .option .price.poor { color: var(--accent); }
-  .modal .close {
-    margin-top: 14px; width: 100%; padding: 12px; background: transparent;
-    color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
-    font-family: var(--font-body); font-size: 0.78rem; letter-spacing: 2px;
-    text-transform: uppercase; cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: color 0.2s, border-color 0.2s;
-  }
-  .modal .close:hover { color: var(--text); border-color: var(--muted); }
-  .modal .upgrade-info {
-    display: flex; justify-content: space-between;
-    padding: 10px 0; border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border); margin-bottom: 14px;
-    font-size: 0.78rem; color: var(--muted);
-  }
-  .modal .upgrade-info b { color: var(--text); font-family: var(--font-head); }
+  .method:hover { border-color:var(--green); }
+  .method.disabled { opacity:0.4; cursor:not-allowed; }
+  .method .m-ico { font-size:1.4rem; flex-shrink:0; }
+  .method .m-info { flex:1; }
+  .method .m-info .m-name { font-family:var(--font-head); font-size:0.85rem; font-weight:700; text-transform:uppercase; }
+  .method .m-info .m-desc { font-size:0.64rem; color:var(--muted); margin-top:2px; }
+  .method .m-risk { font-size:0.64rem; font-weight:600; white-space:nowrap; }
+  .m-risk.low { color:var(--green-bright); }
+  .m-risk.mid { color:var(--gold); }
+  .m-risk.high { color:var(--danger-bright); }
+  .modal .close { margin-top:10px; width:100%; padding:11px; background:transparent; color:var(--muted); border:1px solid var(--border); border-radius:4px; font-family:var(--font-body); font-size:0.72rem; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; }
 
   /* CHAT */
   .chat-toggle {
-    position: fixed;
-    bottom: calc(20px + env(safe-area-inset-bottom));
-    right: 20px; width: 56px; height: 56px;
-    border-radius: 50%; background: var(--accent);
-    border: none; color: #fff; font-size: 1.4rem;
-    cursor: pointer; z-index: 15;
-    box-shadow: 0 4px 20px rgba(176,37,37,0.4);
-    -webkit-tap-highlight-color: transparent;
-    transition: transform 0.15s;
-    display: flex; align-items: center; justify-content: center;
+    position:fixed; bottom:calc(18px + env(safe-area-inset-bottom)); right:16px;
+    width:52px; height:52px; border-radius:50%; background:var(--green);
+    border:none; color:#0a0c08; font-size:1.3rem; cursor:pointer; z-index:15;
+    box-shadow:0 4px 18px rgba(106,168,79,0.4); -webkit-tap-highlight-color:transparent;
+    display:flex; align-items:center; justify-content:center; transition:transform 0.15s;
   }
-  .chat-toggle:active { transform: scale(0.92); }
+  .chat-toggle:active { transform:scale(0.92); }
   .chat-toggle .badge {
-    position: absolute; top: -2px; right: -2px;
-    min-width: 18px; height: 18px; border-radius: 9px;
-    background: #4a7a3a; color: #fff; font-size: 0.6rem;
-    font-weight: 700; display: none;
-    align-items: center; justify-content: center; padding: 0 5px;
+    position:absolute; top:-2px; right:-2px; min-width:17px; height:17px;
+    border-radius:9px; background:var(--danger); color:#fff; font-size:0.58rem;
+    font-weight:700; display:none; align-items:center; justify-content:center; padding:0 4px;
   }
-  .chat-toggle .badge.on { display: flex; }
-
+  .chat-toggle .badge.on { display:flex; }
   .chat-panel {
-    position: fixed; top: 0; right: 0; bottom: 0;
-    width: 380px; max-width: 100vw;
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    z-index: 16; display: flex; flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+    position:fixed; top:0; right:0; bottom:0; width:360px; max-width:100vw;
+    background:var(--surface); border-left:1px solid var(--border); z-index:16;
+    display:flex; flex-direction:column; transform:translateX(100%);
+    transition:transform 0.3s ease; padding-top:env(safe-area-inset-top);
+    padding-bottom:env(safe-area-inset-bottom);
   }
-  .chat-panel.open { transform: translateX(0); }
-  .chat-head {
-    flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; border-bottom: 1px solid var(--border);
-    font-family: var(--font-head); font-size: 0.95rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 1px;
-  }
-  .chat-head .online {
-    font-family: var(--font-body); font-size: 0.6rem;
-    letter-spacing: 1px; color: var(--muted);
-    text-transform: none; font-weight: 500;
-  }
-  .chat-head .online::before {
-    content: ''; display: inline-block; width: 6px; height: 6px;
-    border-radius: 50%; background: #4a7a3a; margin-right: 5px;
-    vertical-align: middle;
-  }
-  .chat-head .online.off::before { background: var(--accent); }
-  .chat-close {
-    background: transparent; border: none; color: var(--muted);
-    font-size: 1.4rem; cursor: pointer; line-height: 1;
-    -webkit-tap-highlight-color: transparent; padding: 0 6px;
-  }
-  .chat-close:hover { color: var(--text); }
-  .chat-messages {
-    flex: 1; overflow-y: auto; padding: 12px 14px;
-    display: flex; flex-direction: column; gap: 8px;
-    -webkit-overflow-scrolling: touch;
-  }
-  .chat-empty {
-    text-align: center; color: var(--muted); font-size: 0.78rem;
-    margin-top: 40px; padding: 0 20px;
-  }
-  .msg { display: flex; flex-direction: column; max-width: 85%; }
-  .msg.self { align-self: flex-end; align-items: flex-end; }
-  .msg .who {
-    font-size: 0.62rem; font-weight: 600; letter-spacing: 1px;
-    text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
-    padding: 0 4px;
-  }
-  .msg.self .who { color: var(--accent); }
-  .msg .body {
-    background: var(--surface-2); border: 1px solid var(--border);
-    padding: 7px 11px; border-radius: 8px;
-    font-size: 0.82rem; line-height: 1.4; word-wrap: break-word;
-    overflow-wrap: break-word;
-  }
-  .msg.self .body {
-    background: rgba(176,37,37,0.15); border-color: rgba(176,37,37,0.4);
-  }
-  .msg .time {
-    font-size: 0.55rem; color: var(--muted); margin-top: 2px; padding: 0 4px;
-  }
-  .chat-form {
-    flex-shrink: 0; display: flex; gap: 6px; padding: 10px 12px;
-    border-top: 1px solid var(--border); background: var(--surface);
-  }
-  .chat-form input {
-    flex: 1; padding: 10px 12px; background: var(--bg);
-    border: 1px solid var(--border); border-radius: 4px;
-    color: var(--text); font-family: var(--font-body); font-size: 0.85rem;
-    outline: none; min-width: 0;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .chat-form input:focus { border-color: var(--accent); }
-  .chat-form input::placeholder { color: var(--muted); }
-  .chat-form input:disabled { opacity: 0.5; }
-  .chat-form button {
-    padding: 10px 16px; background: var(--accent); color: #fff;
-    border: none; border-radius: 4px;
-    font-family: var(--font-body); font-size: 0.75rem;
-    font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
-    cursor: pointer; -webkit-tap-highlight-color: transparent;
-    transition: background 0.2s;
-  }
-  .chat-form button:hover { background: #c93030; }
-  .chat-form button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .chat-panel.open { transform:translateX(0); }
+  .chat-head { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); font-family:var(--font-head); font-size:0.9rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+  .chat-head .online { font-family:var(--font-body); font-size:0.58rem; letter-spacing:1px; color:var(--muted); text-transform:none; font-weight:500; }
+  .chat-head .online::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--green); margin-right:5px; vertical-align:middle; }
+  .chat-head .online.off::before { background:var(--danger); }
+  .chat-close { background:transparent; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; padding:0 6px; line-height:1; }
+  .chat-messages { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:7px; -webkit-overflow-scrolling:touch; }
+  .chat-empty { text-align:center; color:var(--muted); font-size:0.74rem; margin-top:36px; padding:0 18px; }
+  .msg { display:flex; flex-direction:column; max-width:85%; }
+  .msg.self { align-self:flex-end; align-items:flex-end; }
+  .msg .who { font-size:0.58rem; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:2px; padding:0 4px; }
+  .msg.self .who { color:var(--green-bright); }
+  .msg .body { background:var(--surface-2); border:1px solid var(--border); padding:6px 10px; border-radius:7px; font-size:0.8rem; line-height:1.4; word-wrap:break-word; overflow-wrap:break-word; }
+  .msg.self .body { background:rgba(106,168,79,0.15); border-color:rgba(106,168,79,0.4); }
+  .msg .time { font-size:0.52rem; color:var(--muted); margin-top:2px; padding:0 4px; }
+  .chat-form { flex-shrink:0; display:flex; gap:6px; padding:8px 10px; border-top:1px solid var(--border); background:var(--surface); }
+  .chat-form input { flex:1; padding:9px 11px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:var(--font-body); font-size:0.82rem; outline:none; min-width:0; }
+  .chat-form input:focus { border-color:var(--green); }
+  .chat-form input::placeholder { color:var(--muted); }
+  .chat-form input:disabled { opacity:0.5; }
+  .chat-form button { padding:9px 14px; background:var(--green); color:#0a0c08; border:none; border-radius:4px; font-family:var(--font-body); font-size:0.7rem; font-weight:600; letter-spacing:1px; text-transform:uppercase; cursor:pointer; }
+  .chat-form button:disabled { opacity:0.4; cursor:not-allowed; }
 
-  @media (max-width: 520px) {
-    .stat { padding: 3px 8px; }
-    .stat .val { font-size: 0.85rem; }
-    .stat .lbl { font-size: 0.5rem; }
-    .hud-btn { padding: 6px 10px; font-size: 0.6rem; }
-    .map { gap: 2px; }
-    .modal { padding: 22px 18px; }
-    .chat-panel { width: 100vw; }
+  @media (max-width:520px) {
+    .stat .val { font-size:0.78rem; }
+    .stat .lbl { font-size:0.46rem; }
+    .tab { font-size:0.62rem; padding:10px 6px; }
+    .chat-panel { width:100vw; }
   }
 </style>
 </head>
 <body>
 
 <header class="hud">
-  <div class="stat">
-    <span class="lbl">Para</span>
-    <span class="val gold" id="statMoney">$0</span>
-  </div>
-  <div class="stat">
-    <span class="lbl">Gelir</span>
-    <span class="val green" id="statIncome">$0/sn</span>
-  </div>
-  <div class="stat">
-    <span class="lbl">Arsa</span>
-    <span class="val" id="statPlots">0/96</span>
-  </div>
+  <div class="stat"><span class="lbl">Para</span><span class="val gold" id="statMoney">₺0</span></div>
+  <div class="stat"><span class="lbl">Gün</span><span class="val" id="statDay">1</span></div>
+  <div class="stat"><span class="lbl">Pazar</span><span class="val green" id="statPrice">₺165/kg</span></div>
+  <div class="stat"><span class="lbl">Konteyner</span><span class="val" id="statContainer">Sv.1</span></div>
   <div class="hud-spacer"></div>
-  <button class="hud-btn" id="resetBtn" type="button">Sıfırla</button>
+  <button id="resetBtn" type="button">Sıfırla</button>
 </header>
 
-<div class="legend">
-  <span><i style="background:#4a7a3a"></i>Kenar</span>
-  <span><i style="background:#c99a2e"></i>Merkez</span>
-  <span><i style="background:#7a7a82"></i>Sanayi</span>
-  <span><i style="background:#7a4a9a"></i>Mağara</span>
+<div class="tabs" id="tabs">
+  <button class="tab active" data-tab="uretim">Üretim</button>
+  <button class="tab" data-tab="pazar">Pazar</button>
+  <button class="tab" data-tab="konteyner">Konteyner</button>
+  <button class="tab" data-tab="depo">Depo</button>
 </div>
 
-<main class="map-wrap">
-  <div class="map" id="map"></div>
-</main>
+<main class="content" id="tabContent"></main>
 
 <div class="modal-back" id="modalBack">
   <div class="modal" id="modal"></div>
 </div>
 
 <!-- CHAT -->
-<button class="chat-toggle" id="chatToggle" aria-label="Sohbet">
-  💬<span class="badge" id="chatBadge"></span>
-</button>
+<button class="chat-toggle" id="chatToggle" aria-label="Sohbet">💬<span class="badge" id="chatBadge"></span></button>
 <aside class="chat-panel" id="chatPanel">
   <div class="chat-head">
     <span>Flo Diyarı Sohbet</span>
@@ -342,9 +274,7 @@
     <button class="chat-close" id="chatClose" aria-label="Kapat">×</button>
   </div>
   <div class="chat-messages" id="chatMessages">
-    <div class="chat-empty" id="chatEmpty">
-      Henüz mesaj yok. İlk konuşan sen ol.
-    </div>
+    <div class="chat-empty" id="chatEmpty">Henüz mesaj yok. İlk konuşan sen ol.</div>
   </div>
   <form class="chat-form" id="chatForm">
     <input type="text" id="chatInput" placeholder="Mesaj yaz..." maxlength="200" autocomplete="off" disabled />
@@ -353,372 +283,734 @@
 </aside>
 
 <script type="module">
-  // ================== OYUN ==================
-  const COLS = 12, ROWS = 8;
-  const SAVE_KEY = 'florod_save_v1';
-  const START_MONEY = 1000;
+/* ============================================================
+   SABİTLER
+============================================================ */
+const SAVE_KEY = 'florod_mushroom_v2';
+const START_MONEY = 2500;
+const BATCH_WEIGHT = 10; // kg substrat / parti
 
-  function zoneOf(x, y) {
-    if (y < ROWS / 2) return x < COLS / 2 ? 'kenar' : 'merkez';
-    return x < COLS / 2 ? 'sanayi' : 'magara';
-  }
-  const ZONE_NAMES = { kenar: 'Kenar', merkez: 'Merkez', sanayi: 'Sanayi', magara: 'Mağara' };
+const MATERIALS = {
+  straw:  { name:'Buğday Samanı',  unit:'kg',   price:5,   icon:'🌾' },
+  bran:   { name:'Buğday Kepeği',  unit:'kg',   price:15,  icon:'🌾' },
+  gypsum: { name:'Alçı',           unit:'kg',   price:10,  icon:'🪨' },
+  lime:   { name:'Sönmüş Kireç',   unit:'kg',   price:8,   icon:'🧂' },
+  spawn:  { name:'Misel',          unit:'kg',   price:150, icon:'🍄' },
+  bag:    { name:'Poşet',          unit:'adet', price:5,   icon:'🛍️' }
+};
 
-  const PROFS = {
-    ciftlik:   { name: 'Çiftlik',        icon: '🌾', cost: 300,  income: 1.0, region: 'kenar' },
-    mantarhane:{ name: 'Mantarhane',     icon: '🍄', cost: 150,  income: 0.5, region: 'kenar' },
-    kafe:      { name: 'Kafe',           icon: '☕', cost: 500,  income: 2.0, region: 'merkez' },
-    firin:     { name: 'Fırın',          icon: '🍞', cost: 350,  income: 1.2, region: 'merkez' },
-    petrol:    { name: 'Petrol',         icon: '🛢️', cost: 2000, income: 8.0, region: 'sanayi' },
-    atolye:    { name: 'Atölye',         icon: '⚙️', cost: 800,  income: 4.0, region: 'sanayi' },
-    mantarM:   { name: 'Mantar Mağarası',icon: '🍄', cost: 200,  income: 0.8, region: 'magara' },
-    maden:     { name: 'Maden',          icon: '⛏️', cost: 1200, income: 3.0, region: 'magara' }
-  };
-  const PROFS_BY_ZONE = {
-    kenar: ['ciftlik', 'mantarhane'],
-    merkez: ['kafe', 'firin'],
-    sanayi: ['petrol', 'atolye'],
-    magara: ['mantarM', 'maden']
-  };
+const RECIPE = { straw:7, bran:2, gypsum:0.5, lime:0.5, bag:4 };
 
-  let state = { money: START_MONEY, lastTick: Date.now(), plots: {} };
+const METHODS = {
+  hot:   { name:'Sıcak Su',   icon:'♨️', duration:20, risk:0.15, cost:0,  desc:'60–70°C, 2–3 saat' },
+  lime:  { name:'Kireç Banyosu', icon:'🧪', duration:45, risk:0.08, cost:0,  desc:'%1–2 kireç, 12–24 saat' },
+  steam: { name:'Buhar',      icon:'💨', duration:15, risk:0.05, cost:30, desc:'80°C, 2 saat' }
+};
 
-  function save() {
-    try {
-      state.lastTick = Date.now();
-      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-    } catch (e) {}
-  }
-  function load() {
-    try {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed.money === 'number' && parsed.plots) {
-        state = parsed;
-        const elapsed = Math.max(0, (Date.now() - (state.lastTick || Date.now())) / 1000);
-        const offline = totalIncome() * elapsed;
-        if (offline > 0) state.money += offline;
-      }
-    } catch (e) {}
+const PHASES = {
+  pasteurizing:{ label:'Pastörizasyon', duration:20 },
+  cooling:     { label:'Soğutma', duration:5 },
+  cooled:      { label:'Misel Bekliyor', duration:0 },
+  incubating:  { label:'Kuluçka', duration:40 },
+  pinning:     { label:'Pin Oluşumu', duration:8 },
+  fruiting:    { label:'Meyveleme', duration:25 },
+  ready:       { label:'Hasada Hazır', duration:0 },
+  resting:     { label:'Dinlenme', duration:12 },
+  spent:       { label:'Tükendi', duration:0 },
+  contaminated:{ label:'Kontamine', duration:0 }
+};
+
+const CONTAINER_LEVELS = [
+  null,
+  { name:'20ft Temel Konteyner', capacity:50,  storage:100,  climate:0.35, priceBonus:0,   cost:0 },
+  { name:'Yalıtım + 4 Kat Raf',  capacity:150, storage:300,  climate:0.50, priceBonus:0,   cost:12000 },
+  { name:'İklimlendirme (AC+Nem+Fan)', capacity:150, storage:300, climate:0.72, priceBonus:0, cost:30000 },
+  { name:'HEPA + Otomasyon',     capacity:250, storage:500,  climate:0.88, priceBonus:0,   cost:65000 },
+  { name:'İkinci Konteyner + Soğuk Hava', capacity:500, storage:1000, climate:0.95, priceBonus:0.10, cost:140000 }
+];
+
+/* ============================================================
+   DURUM
+============================================================ */
+let state = {
+  money: START_MONEY,
+  day: 1,
+  tickCount: 0,
+  inventory: { straw:0, bran:0, gypsum:0, lime:0, spawn:0, bag:0, mushroom:0 },
+  batches: [],
+  containerLevel: 1,
+  marketPrice: 165,
+  lastTick: Date.now()
+};
+
+/* ============================================================
+   KAYIT
+============================================================ */
+function save() {
+  try {
     state.lastTick = Date.now();
-  }
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch(e){}
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.money === 'number' && parsed.batches) {
+      state = parsed;
+      // offline ilerleme
+      const elapsed = Math.max(0, (Date.now() - (state.lastTick || Date.now())) / 1000);
+      if (elapsed > 1) advanceOffline(elapsed);
+    }
+  } catch(e){}
+  state.lastTick = Date.now();
+}
 
-  function plotIncome(plot) {
-    const p = PROFS[plot.prof];
-    if (!p) return 0;
-    return p.income * Math.pow(1.2, plot.level - 1);
-  }
-  function totalIncome() {
-    let t = 0;
-    for (const k in state.plots) t += plotIncome(state.plots[k]);
-    return t;
-  }
-  function upgradeCost(plot) {
-    const p = PROFS[plot.prof];
-    return Math.floor(p.cost * 1.5 * Math.pow(1.5, plot.level - 1));
-  }
-  function fmt(n) {
-    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
-    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-    return Math.floor(n).toString();
-  }
-
-  const mapEl = document.getElementById('map');
-  const statMoney = document.getElementById('statMoney');
-  const statIncome = document.getElementById('statIncome');
-  const statPlots = document.getElementById('statPlots');
-  const modalBack = document.getElementById('modalBack');
-  const modalEl = document.getElementById('modal');
-
-  function render() {
-    mapEl.innerHTML = '';
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        const zone = zoneOf(x, y);
-        const id = x + '-' + y;
-        const plot = state.plots[id];
-        const cell = document.createElement('div');
-        cell.className = 'cell ' + zone + (plot ? ' owned' : '');
-        cell.dataset.id = id;
-        if (plot) {
-          const p = PROFS[plot.prof];
-          cell.textContent = p ? p.icon : '?';
-          if (plot.level > 1) {
-            const lvl = document.createElement('span');
-            lvl.className = 'lvl';
-            lvl.textContent = 'Lv' + plot.level;
-            cell.appendChild(lvl);
-          }
-        }
-        cell.addEventListener('click', () => openPlot(id));
-        mapEl.appendChild(cell);
+function advanceOffline(seconds) {
+  state.batches.forEach(b => {
+    let remaining = seconds;
+    let guard = 0;
+    while (remaining > 0 && b.duration > 0 &&
+           !['cooled','ready','spent','contaminated'].includes(b.phase) && guard++ < 1000) {
+      const needed = (100 - b.progress) / 100 * b.duration;
+      if (remaining >= needed) {
+        remaining -= needed;
+        b.progress = 100;
+        nextPhase(b);
+      } else {
+        b.progress += (remaining / b.duration) * 100;
+        remaining = 0;
       }
     }
-    statMoney.textContent = '$' + fmt(state.money);
-    statIncome.textContent = '$' + totalIncome().toFixed(1) + '/sn';
-    statPlots.textContent = Object.keys(state.plots).length + '/' + (COLS * ROWS);
-  }
-
-  function openPlot(id) {
-    const [x, y] = id.split('-').map(Number);
-    const zone = zoneOf(x, y);
-    const plot = state.plots[id];
-    if (plot) openOwned(id, plot, zone);
-    else openClaim(id, zone);
-  }
-
-  function openClaim(id, zone) {
-    const options = PROFS_BY_ZONE[zone];
-    modalEl.innerHTML = `
-      <h2>Arsa Sahiplen</h2>
-      <span class="zone-name">${ZONE_NAMES[zone]} Bölgesi</span>
-      <div class="balance">Bakiyen: <b>$${fmt(state.money)}</b></div>
-      <div id="options"></div>
-      <button class="close" id="closeBtn">Kapat</button>
-    `;
-    const optWrap = modalEl.querySelector('#options');
-    options.forEach(key => {
-      const p = PROFS[key];
-      const canAfford = state.money >= p.cost;
-      const div = document.createElement('div');
-      div.className = 'option' + (canAfford ? '' : ' disabled');
-      div.innerHTML = `
-        <div class="ico">${p.icon}</div>
-        <div class="info">
-          <span class="name">${p.name}</span>
-          <div class="desc">Gelir: <b>+$${p.income}/sn</b></div>
-        </div>
-        <div class="price ${canAfford ? '' : 'poor'}">$${fmt(p.cost)}</div>
-      `;
-      if (canAfford) {
-        div.addEventListener('click', () => {
-          state.money -= p.cost;
-          state.plots[id] = { prof: key, level: 1 };
-          save(); closeModal(); render();
-        });
-      }
-      optWrap.appendChild(div);
-    });
-    modalEl.querySelector('#closeBtn').addEventListener('click', closeModal);
-    modalBack.classList.add('on');
-  }
-
-  function openOwned(id, plot, zone) {
-    const p = PROFS[plot.prof];
-    const inc = plotIncome(plot);
-    const cost = upgradeCost(plot);
-    const canUpgrade = state.money >= cost;
-    modalEl.innerHTML = `
-      <h2>${p.icon} ${p.name}</h2>
-      <span class="zone-name">${ZONE_NAMES[zone]} · Seviye ${plot.level}</span>
-      <div class="upgrade-info">
-        <span>Mevcut: <b>+$${inc.toFixed(1)}/sn</b></span>
-        <span>Sonraki: <b>+$${(inc * 1.2).toFixed(1)}/sn</b></span>
-      </div>
-      <div class="option ${canUpgrade ? '' : 'disabled'}" id="upgBtn">
-        <div class="ico">⬆️</div>
-        <div class="info">
-          <span class="name">Yükselt</span>
-          <div class="desc">+20% gelir, seviye artar</div>
-        </div>
-        <div class="price ${canUpgrade ? '' : 'poor'}">$${fmt(cost)}</div>
-      </div>
-      <button class="close" id="closeBtn">Kapat</button>
-    `;
-    if (canUpgrade) {
-      modalEl.querySelector('#upgBtn').addEventListener('click', () => {
-        state.money -= cost;
-        plot.level += 1;
-        save(); closeModal(); render();
-      });
-    }
-    modalEl.querySelector('#closeBtn').addEventListener('click', closeModal);
-    modalBack.classList.add('on');
-  }
-
-  function closeModal() { modalBack.classList.remove('on'); }
-  modalBack.addEventListener('click', (e) => {
-    if (e.target === modalBack) closeModal();
   });
+}
 
-  function tick() {
-    const now = Date.now();
-    const dt = Math.max(0, (now - state.lastTick) / 1000);
-    state.money += totalIncome() * dt;
-    state.lastTick = now;
-    statMoney.textContent = '$' + fmt(state.money);
+/* ============================================================
+   HESAPLAR
+============================================================ */
+function container() { return CONTAINER_LEVELS[state.containerLevel]; }
+
+function storageCap() { return container().storage; }
+function storageUsed() { return state.inventory.mushroom; }
+
+function activeSubstrate() {
+  return state.batches
+    .filter(b => !['spent','contaminated'].includes(b.phase))
+    .reduce((s) => s + BATCH_WEIGHT, 0);
+}
+
+function fmt(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+  return Math.floor(n).toString();
+}
+function fmtKg(n) { return (+n).toFixed(1) + ' kg'; }
+function fmtMoney(n) { return '₺' + fmt(n); }
+
+function hasMaterials() {
+  const inv = state.inventory;
+  return inv.straw >= RECIPE.straw && inv.bran >= RECIPE.bran &&
+         inv.gypsum >= RECIPE.gypsum && inv.lime >= RECIPE.lime && inv.bag >= RECIPE.bag;
+}
+
+function contamRiskFor(method) {
+  const base = METHODS[method].risk;
+  const climateFactor = 1.3 - container().climate; // 0.35 iklim → 0.95, 0.95 iklim → 0.35
+  return +(base * climateFactor).toFixed(3);
+}
+
+/* ============================================================
+   PARTİ
+============================================================ */
+function createBatch(method) {
+  if (!hasMaterials()) { alert('Malzeme eksik. Pazar sekmesinden al.'); return; }
+  if (activeSubstrate() + BATCH_WEIGHT > container().capacity) {
+    alert('Konteyner kapasitesi dolu. Parti kaldır veya konteyneri yükselt.');
+    return;
   }
+  const m = METHODS[method];
+  if (state.money < m.cost) { alert('Ek maliyet için para yetersiz.'); return; }
 
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    if (!confirm('Tüm ilerleme silinecek. Emin misin?')) return;
-    localStorage.removeItem(SAVE_KEY);
-    state = { money: START_MONEY, lastTick: Date.now(), plots: {} };
-    save(); render();
-  });
+  // malzeme düş
+  state.inventory.straw  -= RECIPE.straw;
+  state.inventory.bran   -= RECIPE.bran;
+  state.inventory.gypsum -= RECIPE.gypsum;
+  state.inventory.lime   -= RECIPE.lime;
+  state.inventory.bag    -= RECIPE.bag;
+  state.money -= m.cost;
 
-  load();
-  render();
-  setInterval(tick, 250);
-  setInterval(save, 5000);
-  window.addEventListener('beforeunload', save);
-
-  // ================== SOHBET ==================
-  // >>> BURAYA KENDİ FIREBASE CONFIG'İNİ YAPIŞTIR <<<
-  const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-    projectId: "YOUR_PROJECT",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+  const b = {
+    id: Date.now() + Math.random(),
+    phase: 'pasteurizing',
+    progress: 0,
+    duration: m.duration,
+    method,
+    contamRisk: contamRiskFor(method),
+    flush: 1,
+    logs: [`Kompost karıştırıldı (7 kg saman, 2 kg kepek, 0.5 kg alçı, 0.5 kg kireç). ${m.name} başladı.`]
   };
+  state.batches.push(b);
+  closeModal();
+  render();
+  save();
+}
 
-  const chatEnabled = !firebaseConfig.apiKey.startsWith("YOUR_");
+function nextPhase(b) {
+  switch (b.phase) {
+    case 'pasteurizing':
+      b.phase = 'cooling'; b.duration = PHASES.cooling.duration; b.progress = 0;
+      b.logs.push('Pastörizasyon tamamlandı. Soğutuluyor.');
+      break;
+    case 'cooling':
+      b.phase = 'cooled'; b.duration = 0; b.progress = 100;
+      b.logs.push('Soğutuldu. Misel ekimi bekliyor (0.3 kg misel gerekli).');
+      break;
+    case 'incubating':
+      if (Math.random() < b.contamRisk) {
+        b.phase = 'contaminated'; b.duration = 0; b.progress = 0;
+        b.logs.push('❌ Kontaminasyon! Parti kaybedildi. (Trichoderma riski)');
+      } else {
+        b.phase = 'pinning'; b.duration = PHASES.pinning.duration; b.progress = 0;
+        b.logs.push('Misel tam kolonize oldu. Sıcaklık düşürüldü, pin oluşumu başlıyor.');
+      }
+      break;
+    case 'pinning':
+      b.phase = 'fruiting'; b.duration = PHASES.fruiting.duration; b.progress = 0;
+      b.logs.push('Pinler oluştu. Meyveleme başladı (15–20°C, %85–95 nem, CO₂ <700 ppm).');
+      break;
+    case 'fruiting':
+      b.phase = 'ready'; b.duration = 0; b.progress = 100;
+      b.logs.push('🍄 Hasada hazır!');
+      break;
+    case 'resting':
+      b.phase = 'pinning'; b.duration = PHASES.pinning.duration; b.progress = 0;
+      b.logs.push('Dinlenme bitti. Yeni flaş için pin oluşumu başlıyor.');
+      break;
+  }
+}
 
-  const chatToggle = document.getElementById('chatToggle');
-  const chatPanel = document.getElementById('chatPanel');
-  const chatClose = document.getElementById('chatClose');
-  const chatForm = document.getElementById('chatForm');
-  const chatInput = document.getElementById('chatInput');
-  const chatSend = document.getElementById('chatSend');
-  const chatMessages = document.getElementById('chatMessages');
-  const chatStatus = document.getElementById('chatStatus');
-  const chatBadge = document.getElementById('chatBadge');
+function inoculate(id) {
+  const b = state.batches.find(x => x.id === id);
+  if (!b || b.phase !== 'cooled') return;
+  if (state.inventory.spawn < 0.3) { alert('0.3 kg misel gerekli. Pazar’dan al.'); return; }
+  state.inventory.spawn -= 0.3;
+  b.phase = 'incubating'; b.duration = PHASES.incubating.duration; b.progress = 0;
+  b.logs.push('Misel ekildi. Kuluçka başladı (22–25°C, karanlık, yüksek CO₂).');
+  render(); save();
+}
 
-  let chatOpen = false;
-  let unread = 0;
-  let myName = localStorage.getItem('florod_name') || '';
-  let firstLoad = true;
+function harvest(id) {
+  const b = state.batches.find(x => x.id === id);
+  if (!b || b.phase !== 'ready') return;
 
-  function refreshBadge() {
-    if (unread > 0 && !chatOpen) {
-      chatBadge.textContent = unread > 99 ? '99+' : unread;
-      chatBadge.classList.add('on');
-    } else {
-      chatBadge.classList.remove('on');
-    }
+  const base = [2.2, 1.2, 0.6][b.flush - 1] || 0;
+  const climateMult = 0.6 + container().climate * 0.6;
+  const yieldKg = +(base * climateMult).toFixed(2);
+
+  if (storageUsed() + yieldKg > storageCap()) {
+    alert('Depo dolu! Önce mantar sat veya konteyneri yükselt.');
+    return;
   }
 
-  chatToggle.addEventListener('click', () => {
-    chatOpen = !chatOpen;
-    chatPanel.classList.toggle('open', chatOpen);
-    if (chatOpen) {
-      unread = 0;
-      refreshBadge();
-      chatInput.focus();
-      scrollChatBottom();
+  state.inventory.mushroom += yieldKg;
+  b.flush += 1;
+  b.logs.push(`Hasat: ${yieldKg} kg mantar (Flaş ${b.flush - 1}).`);
+
+  if (b.flush > 3) {
+    b.phase = 'spent'; b.duration = 0; b.progress = 0;
+    b.logs.push('3 flaş tamamlandı. Parti tükendi, kaldır.');
+  } else {
+    b.phase = 'resting'; b.duration = PHASES.resting.duration; b.progress = 0;
+    b.logs.push('Parti dinlenmeye alındı.');
+  }
+  render(); save();
+}
+
+function removeBatch(id) {
+  const idx = state.batches.findIndex(x => x.id === id);
+  if (idx === -1) return;
+  const b = state.batches[idx];
+  if (!['spent','contaminated'].includes(b.phase)) {
+    if (!confirm('Bu parti henüz bitmedi. Kaldırmak istediğine emin misin? Malzeme kaybolur.')) return;
+  }
+  state.batches.splice(idx, 1);
+  render(); save();
+}
+
+/* ============================================================
+   PAZAR
+============================================================ */
+function buyMaterial(mat, qty) {
+  const m = MATERIALS[mat];
+  const total = m.price * qty;
+  if (state.money < total) { alert('Para yetersiz.'); return; }
+  state.money -= total;
+  state.inventory[mat] += qty;
+  render(); save();
+}
+
+function sellMushrooms(qty) {
+  const amount = qty === 'all' ? state.inventory.mushroom : Math.min(qty, state.inventory.mushroom);
+  if (amount <= 0) return;
+  const pricePerKg = state.marketPrice * (1 + container().priceBonus);
+  const revenue = amount * pricePerKg;
+  state.inventory.mushroom -= amount;
+  state.money += revenue;
+  render(); save();
+}
+
+/* ============================================================
+   KONTEYNER
+============================================================ */
+function upgradeContainer() {
+  const next = state.containerLevel + 1;
+  if (next >= CONTAINER_LEVELS.length) return;
+  const lvl = CONTAINER_LEVELS[next];
+  if (state.money < lvl.cost) { alert('Para yetersiz.'); return; }
+  if (!confirm(`${lvl.name} için ${fmtMoney(lvl.cost)} ödenecek. Onaylıyor musun?`)) return;
+  state.money -= lvl.cost;
+  state.containerLevel = next;
+  render(); save();
+}
+
+/* ============================================================
+   RENDER
+============================================================ */
+const tabContent = document.getElementById('tabContent');
+const modalBack = document.getElementById('modalBack');
+const modalEl = document.getElementById('modal');
+let activeTab = 'uretim';
+
+function renderHUD() {
+  document.getElementById('statMoney').textContent = fmtMoney(state.money);
+  document.getElementById('statDay').textContent = state.day;
+  document.getElementById('statPrice').textContent = '₺' + Math.round(state.marketPrice) + '/kg';
+  document.getElementById('statContainer').textContent = 'Sv.' + state.containerLevel;
+}
+
+function render() {
+  renderHUD();
+  if (activeTab === 'uretim') renderUretim();
+  else if (activeTab === 'pazar') renderPazar();
+  else if (activeTab === 'konteyner') renderKonteyner();
+  else if (activeTab === 'depo') renderDepo();
+}
+
+function renderUretim() {
+  const c = container();
+  let html = `
+    <div class="section-head">
+      <h2>Üretim</h2>
+      <button class="btn btn-green" data-action="newBatch">+ Yeni Parti</button>
+    </div>
+  `;
+
+  if (state.batches.length === 0) {
+    html += `<div class="hint">
+      Henüz parti yok. <b>Pazar</b>'dan malzeme al (7 kg saman, 2 kg kepek, 0.5 kg alçı, 0.5 kg kireç, 4 poşet), sonra <b>+ Yeni Parti</b> ile başla.
+      Miseli ayrıca almayı unutma — soğutma sonrası <b>0.3 kg</b> gerekecek.
+    </div>`;
+  }
+
+  html += `<div class="hint">Aktif substrat: <b>${activeSubstrate()} / ${c.capacity} kg</b> · İklim kontrolü: <b>%${Math.round(c.climate*100)}</b> · Depo: <b>${storageUsed().toFixed(1)} / ${c.storage} kg</b></div>`;
+
+  state.batches.forEach(b => {
+    const ph = PHASES[b.phase];
+    const isBad = b.phase === 'contaminated';
+    const isReady = b.phase === 'ready';
+    const timeLeft = b.duration && !['cooled','ready','spent','contaminated'].includes(b.phase)
+      ? Math.ceil((100 - b.progress) / 100 * b.duration) + 'sn'
+      : '';
+
+    html += `
+      <div class="batch ${isBad?'contaminated':''} ${isReady?'ready':''}" data-id="${b.id}">
+        <div class="batch-head">
+          <span class="title">Parti · Flaş ${b.flush}/3</span>
+          <span class="phase ${isBad?'bad':''}">${ph.label}</span>
+        </div>
+        <div class="bar"><div class="fill ${isBad?'bad':''}" style="width:${b.progress||0}%"></div></div>
+        <div class="batch-info">
+          <span>${METHODS[b.method].name} · Risk %${Math.round(b.contamRisk*100)}</span>
+          <span class="time-left">${timeLeft}</span>
+        </div>
+        <div class="batch-log">${b.logs[b.logs.length-1] || ''}</div>
+        <div class="batch-actions">
+          ${b.phase === 'cooled' ? `<button class="btn btn-green" data-action="inoculate" data-id="${b.id}">Misel Ek (0.3 kg)</button>` : ''}
+          ${b.phase === 'ready' ? `<button class="btn btn-green" data-action="harvest" data-id="${b.id}">Hasat Et</button>` : ''}
+          ${['spent','contaminated'].includes(b.phase) ? `<button class="btn btn-danger" data-action="remove" data-id="${b.id}">Kaldır</button>` : ''}
+        </div>
+      </div>
+    `;
+  });
+
+  tabContent.innerHTML = html;
+}
+
+function renderPazar() {
+  let html = `<div class="section-head"><h2>Pazar</h2></div>`;
+  html += `<div class="mat-list">`;
+
+  Object.entries(MATERIALS).forEach(([key, m]) => {
+    html += `
+      <div class="mat">
+        <div class="ico">${m.icon}</div>
+        <div class="info">
+          <div class="name">${m.name}</div>
+          <div class="sub">₺${m.price}/${m.unit}</div>
+        </div>
+        <div class="own">${(+state.inventory[key]).toFixed(key==='bag'?0:1)} ${m.unit}</div>
+        <div class="buy-btns">
+          <button class="btn btn-ghost" data-action="buy" data-mat="${key}" data-qty="1">+1</button>
+          <button class="btn btn-ghost" data-action="buy" data-mat="${key}" data-qty="10">+10</button>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `</div>`;
+
+  const price = state.marketPrice * (1 + container().priceBonus);
+  html += `
+    <div class="sell-box">
+      <h3>Mantar Sat</h3>
+      <div class="sell-row">
+        <div>
+          <div style="font-size:0.7rem;color:var(--muted)">Depoda: ${storageUsed().toFixed(1)} kg</div>
+          <div class="big">₺${price.toFixed(0)}/kg</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-green" data-action="sell" data-qty="1">1 kg</button>
+          <button class="btn btn-green" data-action="sell" data-qty="5">5 kg</button>
+          <button class="btn btn-green" data-action="sell" data-qty="all">Tümünü Sat</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  tabContent.innerHTML = html;
+}
+
+function renderKonteyner() {
+  const c = container();
+  const next = CONTAINER_LEVELS[state.containerLevel + 1];
+
+  let html = `<div class="section-head"><h2>Konteyner</h2></div>`;
+  html += `
+    <div class="container-card">
+      <h3>${c.name}</h3>
+      <span class="lvl">Seviye ${state.containerLevel} / ${CONTAINER_LEVELS.length - 1}</span>
+      <div class="stat-grid">
+        <div class="stat-cell"><div class="k">Substrat Kapasitesi</div><div class="v">${c.capacity} kg</div></div>
+        <div class="stat-cell"><div class="k">Depo</div><div class="v">${c.storage} kg</div></div>
+        <div class="stat-cell"><div class="k">İklim Kontrolü</div><div class="v">%${Math.round(c.climate*100)}</div></div>
+        <div class="stat-cell"><div class="k">Fiyat Bonusu</div><div class="v">+%${Math.round(c.priceBonus*100)}</div></div>
+      </div>
+    </div>
+  `;
+
+  if (next) {
+    html += `
+      <div class="upgrade-box">
+        <h4>${next.name}</h4>
+        <p>Kapasite ${next.capacity} kg · Depo ${next.storage} kg · İklim %${Math.round(next.climate*100)}${next.priceBonus?' · Fiyat +%'+Math.round(next.priceBonus*100):''}</p>
+        <div class="cost">${fmtMoney(next.cost)}</div>
+        <button class="btn btn-green" data-action="upgrade">Yükselt</button>
+      </div>
+    `;
+  } else {
+    html += `<div class="hint">Maksimum seviyeye ulaştın. Konteyner tam kapasite.</div>`;
+  }
+
+  tabContent.innerHTML = html;
+}
+
+function renderDepo() {
+  const cap = storageCap();
+  const used = storageUsed();
+  const pct = Math.min(100, (used / cap) * 100);
+  const price = state.marketPrice * (1 + container().priceBonus);
+
+  let html = `<div class="section-head"><h2>Depo</h2></div>`;
+  html += `
+    <div class="container-card">
+      <h3>Mantar Deposu</h3>
+      <span class="lvl">${used.toFixed(1)} / ${cap} kg</span>
+      <div class="storage-bar"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="sell-row">
+        <div class="big">₺${(used * price).toFixed(0)}</div>
+        <button class="btn btn-green" data-action="sell" data-qty="all" ${used<=0?'disabled':''}>Tümünü Sat</button>
+      </div>
+    </div>
+    <div class="hint">Mantar depoda beklerken bozulmaz. Ama depo dolunca hasat yapamazsın.</div>
+  `;
+
+  tabContent.innerHTML = html;
+}
+
+/* ============================================================
+   TAB / EVENT
+============================================================ */
+document.getElementById('tabs').addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  activeTab = btn.dataset.tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
+  render();
+});
+
+tabContent.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+
+  if (action === 'newBatch') openNewBatch();
+  else if (action === 'buy') buyMaterial(btn.dataset.mat, parseInt(btn.dataset.qty));
+  else if (action === 'sell') sellMushrooms(btn.dataset.qty === 'all' ? 'all' : parseInt(btn.dataset.qty));
+  else if (action === 'upgrade') upgradeContainer();
+  else if (action === 'inoculate') inoculate(parseFloat(btn.dataset.id));
+  else if (action === 'harvest') harvest(parseFloat(btn.dataset.id));
+  else if (action === 'remove') removeBatch(parseFloat(btn.dataset.id));
+  else if (action === 'createBatch') createBatch(btn.dataset.method);
+});
+
+/* ============================================================
+   MODAL — YENİ PARTİ
+============================================================ */
+function openNewBatch() {
+  const missing = [];
+  if (state.inventory.straw < RECIPE.straw) missing.push(`${RECIPE.straw} kg saman`);
+  if (state.inventory.bran < RECIPE.bran) missing.push(`${RECIPE.bran} kg kepek`);
+  if (state.inventory.gypsum < RECIPE.gypsum) missing.push(`${RECIPE.gypsum} kg alçı`);
+  if (state.inventory.lime < RECIPE.lime) missing.push(`${RECIPE.lime} kg kireç`);
+  if (state.inventory.bag < RECIPE.bag) missing.push(`${RECIPE.bag} poşet`);
+
+  const capOk = activeSubstrate() + BATCH_WEIGHT <= container().capacity;
+
+  let html = `
+    <h2>Yeni Parti</h2>
+    <span class="sub">10 kg substrat · İstiridye mantarı</span>
+    <div class="recipe">
+      <b>Reçete:</b> 7 kg saman · 2 kg kepek · 0.5 kg alçı · 0.5 kg kireç · 4 poşet<br>
+      <b>Misel:</b> 0.3 kg (soğutma sonrası ekilecek)<br>
+      <b>Kapasite:</b> ${activeSubstrate()} / ${container().capacity} kg
+    </div>
+  `;
+
+  if (missing.length) {
+    html += `<div class="hint" style="border-left-color:var(--danger)">Eksik malzeme: <b>${missing.join(', ')}</b>. Pazar’dan al.</div>`;
+  }
+  if (!capOk) {
+    html += `<div class="hint" style="border-left-color:var(--danger)">Konteyner kapasitesi dolu. Önce parti kaldır veya yükselt.</div>`;
+  }
+
+  html += `<div style="font-size:0.68rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Pastörizasyon Yöntemi</div>`;
+
+  Object.entries(METHODS).forEach(([key, m]) => {
+    const risk = contamRiskFor(key);
+    const riskClass = risk < 0.08 ? 'low' : risk < 0.15 ? 'mid' : 'high';
+    const disabled = missing.length || !capOk || state.money < m.cost;
+    html += `
+      <div class="method ${disabled?'disabled':''}" ${disabled?'':'data-action="createBatch" data-method="'+key+'"'}>
+        <div class="m-ico">${m.icon}</div>
+        <div class="m-info">
+          <div class="m-name">${m.name}</div>
+          <div class="m-desc">${m.desc} · ${m.duration}sn${m.cost?' · +₺'+m.cost:''}</div>
+        </div>
+        <div class="m-risk ${riskClass}">Risk %${Math.round(risk*100)}</div>
+      </div>
+    `;
+  });
+
+  html += `<button class="close" id="modalClose">Kapat</button>`;
+
+  modalEl.innerHTML = html;
+  modalBack.classList.add('on');
+  const closeBtn = modalEl.querySelector('#modalClose');
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+}
+
+function closeModal() { modalBack.classList.remove('on'); }
+modalBack.addEventListener('click', (e) => { if (e.target === modalBack) closeModal(); });
+
+/* ============================================================
+   TICK
+============================================================ */
+function tick() {
+  state.tickCount++;
+
+  // pazar fiyatı dalgalanması
+  if (state.tickCount % 20 === 0) {
+    const base = 165;
+    state.marketPrice = Math.round(base * (0.8 + Math.random() * 0.4));
+  }
+
+  // gün
+  if (state.tickCount % 12 === 0) state.day++;
+
+  // partiler
+  state.batches.forEach(b => {
+    if (['cooled','ready','spent','contaminated'].includes(b.phase)) return;
+    if (!b.duration) return;
+    b.progress += 100 / b.duration;
+    if (b.progress >= 100) {
+      b.progress = 100;
+      nextPhase(b);
     }
   });
-  chatClose.addEventListener('click', () => {
-    chatOpen = false;
-    chatPanel.classList.remove('open');
-    refreshBadge();
-  });
 
-  function scrollChatBottom() {
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+  renderHUD();
+  if (activeTab === 'uretim') renderUretim();
+  else if (activeTab === 'depo') renderDepo();
+
+  if (state.tickCount % 5 === 0) save();
+}
+
+/* ============================================================
+   SIFIRLA
+============================================================ */
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Tüm ilerleme silinecek. Emin misin?')) return;
+  localStorage.removeItem(SAVE_KEY);
+  state = {
+    money: START_MONEY, day: 1, tickCount: 0,
+    inventory: { straw:0, bran:0, gypsum:0, lime:0, spawn:0, bag:0, mushroom:0 },
+    batches: [], containerLevel: 1, marketPrice: 165, lastTick: Date.now()
+  };
+  save(); render();
+});
+
+/* ============================================================
+   CHAT
+============================================================ */
+// >>> BURAYA KENDİ FIREBASE CONFIG'İNİ YAP <<<
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const chatEnabled = !firebaseConfig.apiKey.startsWith("YOUR_");
+
+const chatToggle = document.getElementById('chatToggle');
+const chatPanel = document.getElementById('chatPanel');
+const chatClose = document.getElementById('chatClose');
+const chatForm = document.getElementById('chatForm');
+const chatInput = document.getElementById('chatInput');
+const chatSend = document.getElementById('chatSend');
+const chatMessages = document.getElementById('chatMessages');
+const chatStatus = document.getElementById('chatStatus');
+const chatBadge = document.getElementById('chatBadge');
+
+let chatOpen = false, unread = 0, myName = localStorage.getItem('florod_name') || '', firstLoad = true;
+
+function refreshBadge() {
+  if (unread > 0 && !chatOpen) {
+    chatBadge.textContent = unread > 99 ? '99+' : unread;
+    chatBadge.classList.add('on');
+  } else chatBadge.classList.remove('on');
+}
+
+chatToggle.addEventListener('click', () => {
+  chatOpen = !chatOpen;
+  chatPanel.classList.toggle('open', chatOpen);
+  if (chatOpen) { unread = 0; refreshBadge(); chatInput.focus(); chatMessages.scrollTop = chatMessages.scrollHeight; }
+});
+chatClose.addEventListener('click', () => {
+  chatOpen = false; chatPanel.classList.remove('open'); refreshBadge();
+});
+
+function addMessage(msg, isSelf) {
+  const empty = chatMessages.querySelector('.chat-empty');
+  if (empty) empty.remove();
+
+  const div = document.createElement('div');
+  div.className = 'msg' + (isSelf ? ' self' : '');
+
+  const who = document.createElement('span');
+  who.className = 'who';
+  who.textContent = isSelf ? 'Sen' : (msg.name || 'Anonim');
+
+  const body = document.createElement('div');
+  body.className = 'body';
+  body.textContent = msg.text || '';
+
+  const time = document.createElement('span');
+  time.className = 'time';
+  const d = new Date(msg.ts || Date.now());
+  time.textContent = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+
+  div.appendChild(who); div.appendChild(body); div.appendChild(time);
+  chatMessages.appendChild(div);
+
+  if (!firstLoad && !chatOpen && !isSelf) { unread++; refreshBadge(); }
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function initChat() {
+  if (!chatEnabled) {
+    chatStatus.textContent = 'Kapalı';
+    chatStatus.classList.add('off');
+    chatInput.placeholder = 'Sohbet yapılandırılmadı';
+    return;
   }
+  try {
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+    const { getDatabase, ref, push, onChildAdded, query, limitToLast } =
+      await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
 
-  function addMessage(msg, isSelf) {
-    const empty = chatMessages.querySelector('.chat-empty');
-    if (empty) empty.remove();
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-    const div = document.createElement('div');
-    div.className = 'msg' + (isSelf ? ' self' : '');
+    chatStatus.textContent = 'Bağlı';
+    chatStatus.classList.remove('off');
+    chatInput.disabled = false;
+    chatSend.disabled = false;
 
-    const who = document.createElement('span');
-    who.className = 'who';
-    who.textContent = isSelf ? 'Sen' : (msg.name || 'Anonim');
+    const chatRef = query(ref(db, 'chat'), limitToLast(50));
+    onChildAdded(chatRef, (snap) => {
+      const msg = snap.val();
+      if (!msg) return;
+      addMessage(msg, msg.name === myName);
+    });
 
-    const body = document.createElement('div');
-    body.className = 'body';
-    body.textContent = msg.text || '';   // textContent → XSS güvenli
+    setTimeout(() => { firstLoad = false; }, 1500);
 
-    const time = document.createElement('span');
-    time.className = 'time';
-    const d = new Date(msg.ts || Date.now());
-    time.textContent = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-
-    div.appendChild(who);
-    div.appendChild(body);
-    div.appendChild(time);
-    chatMessages.appendChild(div);
-
-    if (!firstLoad && !chatOpen && !isSelf) {
-      unread++;
-      refreshBadge();
-    }
-    scrollChatBottom();
+    chatForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text) return;
+      if (!myName) {
+        const entered = prompt('Sohbette görünecek adın:');
+        if (!entered || !entered.trim()) return;
+        myName = entered.trim().slice(0,20);
+        localStorage.setItem('florod_name', myName);
+      }
+      chatInput.value = '';
+      try {
+        await push(ref(db, 'chat'), { name: myName, text: text.slice(0,200), ts: Date.now() });
+      } catch (err) { alert('Mesaj gönderilemedi: ' + err.message); }
+    });
+  } catch (err) {
+    chatStatus.textContent = 'Hata';
+    chatStatus.classList.add('off');
+    console.error('Chat init error:', err);
   }
+}
 
-  async function initChat() {
-    if (!chatEnabled) {
-      chatStatus.textContent = 'Kapalı';
-      chatStatus.classList.add('off');
-      chatInput.placeholder = 'Sohbet yapılandırılmadı';
-      return;
-    }
-
-    try {
-      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-      const { getDatabase, ref, push, onChildAdded, query, limitToLast, serverTimestamp } =
-        await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-
-      const app = initializeApp(firebaseConfig);
-      const db = getDatabase(app);
-
-      chatStatus.textContent = 'Bağlı';
-      chatStatus.classList.remove('off');
-      chatInput.disabled = false;
-      chatSend.disabled = false;
-
-      const chatRef = query(ref(db, 'chat'), limitToLast(50));
-      onChildAdded(chatRef, (snap) => {
-        const msg = snap.val();
-        if (!msg) return;
-        // kendi mesajımızı geçmiş yüklemede "self" göstermek için isim kontrolü
-        const isSelf = msg.name === myName;
-        addMessage(msg, isSelf);
-      });
-
-      // İlk yüklemeden sonra "unread" saymaya başla
-      setTimeout(() => { firstLoad = false; }, 1500);
-
-      chatForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const text = chatInput.value.trim();
-        if (!text) return;
-
-        if (!myName) {
-          const entered = prompt('Sohbette görünecek adın:');
-          if (!entered || !entered.trim()) return;
-          myName = entered.trim().slice(0, 20);
-          localStorage.setItem('florod_name', myName);
-        }
-
-        chatInput.value = '';
-        try {
-          await push(ref(db, 'chat'), {
-            name: myName,
-            text: text.slice(0, 200),
-            ts: Date.now()
-          });
-        } catch (err) {
-          alert('Mesaj gönderilemedi: ' + err.message);
-        }
-      });
-
-    } catch (err) {
-      chatStatus.textContent = 'Hata';
-      chatStatus.classList.add('off');
-      console.error('Chat init error:', err);
-    }
-  }
-
-  initChat();
+/* ============================================================
+   BAŞLAT
+============================================================ */
+load();
+render();
+setInterval(tick, 1000);
+setInterval(save, 5000);
+window.addEventListener('beforeunload', save);
+initChat();
 </script>
 
 </body>
