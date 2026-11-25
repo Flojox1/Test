@@ -16,6 +16,7 @@ import {
   MASTER_TYPES, STAR_SPEED, RESTART_MODES
 } from './data.js';
 
+import { getFrame } from './assets.js';
 import { initChat } from './chat.js';
 
 let activeTab = 'uretim';
@@ -97,22 +98,6 @@ export function nextPhase(b) {
       b.phase = 'pinning'; b.progress = 0;
       b.logs.push('Dinlenme bitti. Yeni flaş pin oluşumu.');
       break;
-  }
-}
-
-function getPhaseIcon(b) {
-  switch (b.phase) {
-    case 'pasteurizing': return '♨️';
-    case 'cooling':      return '❄️';
-    case 'cooled':       return '🧊';
-    case 'incubating':   return '🧫';
-    case 'pinning':      return '🌱';
-    case 'fruiting':     return '🍄';
-    case 'ready':        return '🍄';
-    case 'resting':      return '💤';
-    case 'spent':        return '💀';
-    case 'contaminated': return '❌';
-    default: return '?';
   }
 }
 
@@ -398,15 +383,53 @@ export function render() {
 
 export function renderLive() {
   renderHUD();
-  const scrollTop = tabContent.scrollTop;
-  if (activeTab === 'uretim') renderUretim();
+  
+  if (activeTab === 'uretim') {
+    if (uretimView === 'container' && viewingContainerId != null) {
+      updateLiveContainerView();
+    } else {
+      renderUretim();
+    }
+  }
   else if (activeTab === 'depo') renderDepo();
   else if (activeTab === 'pazar' && state._marketChanged) {
     renderPazar(); state._marketChanged = false;
   } else if (activeTab === 'ustalar' && state._masterPoolChanged) {
     renderUstalar(); state._masterPoolChanged = false;
   }
-  tabContent.scrollTop = scrollTop;
+}
+
+// Konteyner içindeyken sayfayı yenilemeden resimleri ve barları günceller
+function updateLiveContainerView() {
+  const cont = state.containers.find(c => c.id === viewingContainerId);
+  if (!cont) return;
+  
+  const activeBatches = state.batches.filter(b => b.containerId === cont.id && !['spent','contaminated'].includes(b.phase));
+  
+  activeBatches.forEach(b => {
+    const slotEl = document.querySelector(`.slot[data-id="${b.id}"]`);
+    if (!slotEl) return;
+    
+    const fill = slotEl.querySelector('.slot-fill');
+    if (fill) fill.style.width = `${b.progress}%`;
+    
+    const phaseText = slotEl.querySelector('.slot-phase');
+    if (phaseText && PHASES[b.phase]) {
+      phaseText.textContent = PHASES[b.phase].label;
+    }
+
+    const img = slotEl.querySelector('.slot-bg');
+    if (img) {
+      const newUrl = getFrame(b.phase);
+      if (img.getAttribute('src') !== newUrl) {
+        img.style.opacity = '0'; 
+        setTimeout(() => {
+          img.src = newUrl;
+          img.style.opacity = '1';
+        }, 300);
+      }
+    }
+  });
 }
 
 /* ---------- ÜRETİM ---------- */
@@ -475,6 +498,8 @@ function renderContainerView(cont) {
   const activeBatches = batchesHere.filter(b => !['spent','contaminated'].includes(b.phase));
   const deadBatches = batchesHere.filter(b => ['spent','contaminated'].includes(b.phase));
 
+  const bgImage = getFrame('container');
+
   let html = `
     <div class="container-view-head">
       <div class="left">
@@ -486,37 +511,46 @@ function renderContainerView(cont) {
       </div>
       ${next ? `<button class="btn btn-green" data-action="openUpgrade" data-id="${cont.id}">Yükselt</button>` : ''}
     </div>
+    
+    <div class="container-interior" style="background-image: url('${bgImage}');">
+      <div class="container-overlay">
+        <div class="hint">
+          Substrat: <b>${active}/${lvl.capacity} kg</b> ·
+          Slot: <b>${activeBatches.length}/${slotCount}</b> ·
+          İklim: <b>%${Math.round(lvl.climate*100)}</b>
+        </div>
+
+        <div class="slot-grid" id="slotGrid">
   `;
 
-  html += `<div class="hint">
-    Substrat: <b>${active}/${lvl.capacity} kg</b> ·
-    Slot: <b>${activeBatches.length}/${slotCount}</b> ·
-    İklim: <b>%${Math.round(lvl.climate*100)}</b>
-  </div>`;
-
-  // Slots
-  html += `<div class="slot-grid">`;
   for (let i = 0; i < slotCount; i++) {
     if (i < activeBatches.length) {
       const b = activeBatches[i];
       const ph = PHASES[b.phase] || { label: '?' };
-      const icon = getPhaseIcon(b);
       const isReady = b.phase === 'ready';
       const isBad = b.phase === 'contaminated';
+      const imgUrl = getFrame(b.phase);
+      
       html += `
         <div class="slot filled ${isReady?'ready':''} ${isBad?'bad':''}" data-action="openBatch" data-id="${b.id}">
-          <div class="slot-icon">${icon}</div>
-          <div class="slot-phase">${ph.label}</div>
-          <div class="slot-bar"><div class="slot-fill" style="width:${b.progress||0}%"></div></div>
+          <img src="${imgUrl}" class="slot-bg" alt="${ph.label}" />
+          <div class="slot-overlay">
+            <div class="slot-phase">${ph.label}</div>
+            <div class="slot-bar"><div class="slot-fill" style="width:${b.progress||0}%"></div></div>
+          </div>
         </div>
       `;
     } else {
       html += `<div class="slot empty" data-action="newBatchIn" data-container="${cont.id}" aria-label="Yeni Parti">+</div>`;
     }
   }
-  html += `</div>`;
+  
+  html += `
+        </div>
+      </div>
+    </div>
+  `;
 
-  // Dead batches
   if (deadBatches.length > 0) {
     html += `<div class="dead-batches"><div class="dead-title">Temizlenmesi Gerekenler</div>`;
     deadBatches.forEach(b => {
@@ -993,4 +1027,4 @@ export function init() {
   setInterval(() => save(), 5000);
   window.addEventListener('beforeunload', save);
   initChat();
-}
+    }
