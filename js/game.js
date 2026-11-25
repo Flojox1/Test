@@ -19,12 +19,13 @@ import {
 import { initChat } from './chat.js';
 
 let activeTab = 'uretim';
-let currentSpeed = 1;
+let selectedContainerId = 1;
 let logicInterval = null;
 
 const tabContent = document.getElementById('tabContent');
 const modalBack = document.getElementById('modalBack');
 const modalEl = document.getElementById('modal');
+const fabBtn = document.getElementById('fabBtn');
 
 /* ---------- ADVANCE STATE ---------- */
 export function advanceState() {
@@ -33,24 +34,21 @@ export function advanceState() {
   if (state.tickCount % 12 === 0) state.day++;
 
   if (state.day !== prevDay) {
-    // Maaşlar
     let salary = 0;
     state.masters.forEach(m => salary += m.salary);
     if (salary > 0) state.money -= salary;
 
-    // Piyasa her 60 gün
     if (state.day % 60 === 0) {
       refreshMarket();
       state._marketChanged = true;
     }
-    // Usta havuzu her 7 gün
     if (state.day % 7 === 0) {
       refreshMasterPool();
       state.lastMasterRefreshDay = state.day;
+      state._masterPoolChanged = true;
     }
   }
 
-  // Parti fazları
   state.batches.forEach(b => {
     if (['cooled','ready','spent','contaminated'].includes(b.phase)) return;
     const dur = computeDuration(b);
@@ -78,6 +76,7 @@ export function nextPhase(b) {
       b.contamRisk = currentContamRisk(b);
       if (Math.random() < b.contamRisk) {
         b.phase = 'contaminated'; b.progress = 0;
+        b.contamTick = state.tickCount;
         b.logs.push('❌ Kontaminasyon! Parti kaybedildi.');
       } else {
         b.phase = 'pinning'; b.progress = 0;
@@ -265,10 +264,36 @@ export function fireMaster(id) {
 export function processMasters() {
   const inoc = state.masters.find(m => m.type === 'inoculate');
   const harv = state.masters.find(m => m.type === 'harvest');
+
   state.batches.forEach(b => {
-    if (b.phase === 'cooled' && inoc) inoculate(b.id, true);
+    if (b.phase === 'cooled' && inoc) {
+      // Usta misel yoksa otomatik satın alır (para yeterliyse)
+      if (state.inventory.spawn < 0.3) {
+        const need = 0.3 - state.inventory.spawn;
+        const cost = getMaterialPrice('spawn') * need;
+        if (state.money >= cost) {
+          state.money -= cost;
+          state.inventory.spawn += need;
+          b.logs.push(`💉 Usta ${need.toFixed(2)} kg misel satın aldı (-₺${Math.round(cost)}).`);
+        } else {
+          b.logs.push('⚠️ Usta misel alamadı: para yetersiz.');
+        }
+      }
+      inoculate(b.id, true);
+    }
     if (b.phase === 'ready' && harv) harvest(b.id, true);
   });
+
+  // Ustalar kontamine kompostları temizler (6 tick = yarım gün gecikmeyle)
+  if (state.masters.length > 0) {
+    for (let i = state.batches.length - 1; i >= 0; i--) {
+      const b = state.batches[i];
+      if (b.phase === 'contaminated' && typeof b.contamTick === 'number'
+          && (state.tickCount - b.contamTick) >= 6) {
+        state.batches.splice(i, 1);
+      }
+    }
+  }
 }
 
 /* ---------- PAZAR ---------- */
@@ -321,6 +346,7 @@ export function buyNewContainer() {
   state.money -= NEW_CONTAINER_COST;
   const newId = Math.max(...state.containers.map(c => c.id), 0) + 1;
   state.containers.push({ id: newId, level: 1 });
+  selectedContainerId = newId;
   render(); save();
 }
 
@@ -336,6 +362,7 @@ export function renderHUD() {
   document.querySelectorAll('.speed-btn').forEach(btn => {
     btn.classList.toggle('active', parseInt(btn.dataset.speed) === state.speed);
   });
+  if (fabBtn) fabBtn.classList.toggle('hidden', activeTab !== 'uretim');
 }
 
 export function render() {
@@ -343,7 +370,6 @@ export function render() {
   if (activeTab === 'uretim') renderUretim();
   else if (activeTab === 'pazar') renderPazar();
   else if (activeTab === 'ustalar') renderUstalar();
-  else if (activeTab === 'konteyner') renderKonteyner();
   else if (activeTab === 'depo') renderDepo();
 }
 
@@ -364,52 +390,104 @@ export function renderUretim() {
   let html = `
     <div class="section-head">
       <h2>Üretim</h2>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-ghost" data-action="skipDay">⏩ 1 Gün</button>
-        <button class="btn btn-green" data-action="newBatch">+ Yeni Parti</button>
-      </div>
+      <button class="btn btn-ghost" data-action="skipDay">⏩ 1 Gün</button>
     </div>
   `;
 
-  if (state.batches.length === 0) {
-    html += `<div class="hint">Henüz parti yok. <b>Pazar</b>'dan malzeme al, sonra <b>+ Yeni Parti</b>.</div>`;
-  }
-
-  const totCap = state.containers.reduce((s, c) => s + CONTAINER_LEVELS[c.level].capacity, 0);
-  html += `<div class="hint">Aktif substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b></div>`;
-
-  state.batches.forEach(b => {
-    const ph = PHASES[b.phase] || { label: '?' };
-    const isBad = b.phase === 'contaminated';
-    const isReady = b.phase === 'ready';
-    const isSpent = b.phase === 'spent';
-    const timeLeft = b.duration && !['cooled','ready','spent','contaminated'].includes(b.phase)
-      ? Math.ceil((100 - b.progress) / 100 * b.duration) + 'sn'
-      : '';
-    const risk = currentContamRisk(b);
-
-    let actions = '';
-    if (b.phase === 'cooled') actions += `<button class="btn btn-green" data-action="inoculate" data-id="${b.id}">Misel Ek (0.3 kg)</button>`;
-    if (b.phase === 'ready')  actions += `<button class="btn btn-green" data-action="harvest" data-id="${b.id}">Hasat Et</button>`;
-    if (isSpent) actions += `<button class="btn btn-green" data-action="manualRestart" data-id="${b.id}">Yeniden Başlat</button>`;
-    if (['spent','contaminated'].includes(b.phase)) actions += `<button class="btn btn-danger" data-action="remove" data-id="${b.id}">Kaldır</button>`;
-
+  // Container strip
+  html += `<div class="container-strip">`;
+  state.containers.forEach(c => {
+    const lvl = CONTAINER_LEVELS[c.level];
+    const active = activeSubstrateIn(c.id);
+    const pct = Math.min(100, (active / lvl.capacity) * 100);
     html += `
-      <div class="batch ${isBad?'contaminated':''} ${isReady?'ready':''}" data-id="${b.id}">
-        <div class="batch-head">
-          <span class="title">Parti · Flaş ${b.flush}/3 · K${b.containerId}</span>
-          <span class="phase ${isBad?'bad':''}">${ph.label}</span>
-        </div>
-        <div class="bar"><div class="fill ${isBad?'bad':''}" style="width:${b.progress||0}%"></div></div>
-        <div class="batch-info">
-          <span>${METHODS[b.method].name} · Risk %${Math.round(risk*100)}</span>
-          <span>${timeLeft}</span>
-        </div>
-        <div class="batch-log">${b.logs[b.logs.length-1] || ''}</div>
-        <div class="batch-actions">${actions}</div>
+      <div class="container-chip ${c.id === selectedContainerId ? 'active' : ''}" data-container="${c.id}">
+        <div class="chip-num">K${c.id}</div>
+        <div class="chip-level">Sv.${c.level}</div>
+        <div class="chip-bar"><div class="chip-fill" style="width:${pct}%"></div></div>
+        <div class="chip-status">${active}/${lvl.capacity}</div>
       </div>
     `;
   });
+  if (state.containers.length < MAX_CONTAINERS) {
+    html += `
+      <div class="container-chip container-add" data-action="buyContainer">
+        <div class="chip-num">+</div>
+        <div class="chip-level">Yeni</div>
+      </div>
+    `;
+  }
+  html += `</div>`;
+
+  // Selected container detail
+  const selCont = state.containers.find(c => c.id === selectedContainerId) || state.containers[0];
+  if (selCont) {
+    selectedContainerId = selCont.id;
+    const lvl = CONTAINER_LEVELS[selCont.level];
+    const next = CONTAINER_LEVELS[selCont.level + 1];
+    const active = activeSubstrateIn(selCont.id);
+    html += `
+      <div class="container-detail">
+        <h3>Konteyner #${selCont.id} · ${lvl.name}</h3>
+        <div class="stat-grid">
+          <div class="stat-cell"><div class="k">Substrat</div><div class="v">${active}/${lvl.capacity} kg</div></div>
+          <div class="stat-cell"><div class="k">Depo</div><div class="v">${lvl.storage} kg</div></div>
+          <div class="stat-cell"><div class="k">İklim</div><div class="v">%${Math.round(lvl.climate*100)}</div></div>
+          <div class="stat-cell"><div class="k">Fiyat</div><div class="v">+%${Math.round(lvl.priceBonus*100)}</div></div>
+        </div>
+        ${next ? `
+          <div class="upgrade-box">
+            <h4>Yükselt: ${next.name}</h4>
+            <p>Kapasite ${next.capacity} kg · Depo ${next.storage} kg · İklim %${Math.round(next.climate*100)}${next.priceBonus?' · Fiyat +%'+Math.round(next.priceBonus*100):''}</p>
+            <div class="cost">${fmtMoney(next.cost)}</div>
+            <button class="btn btn-green" data-action="upgradeContainer" data-id="${selCont.id}">Yükselt</button>
+          </div>
+        ` : `<div class="hint">Maksimum seviye.</div>`}
+      </div>
+    `;
+  }
+
+  // Summary
+  const totCap = state.containers.reduce((s, c) => s + CONTAINER_LEVELS[c.level].capacity, 0);
+  html += `<div class="hint">Aktif substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b></div>`;
+
+  // Batches
+  if (state.batches.length === 0) {
+    html += `<div class="hint">Henüz parti yok. Sağ alttaki <b>+</b> butonuna basarak başla.</div>`;
+  } else {
+    state.batches.forEach(b => {
+      const ph = PHASES[b.phase] || { label: '?' };
+      const isBad = b.phase === 'contaminated';
+      const isReady = b.phase === 'ready';
+      const isSpent = b.phase === 'spent';
+      const timeLeft = b.duration && !['cooled','ready','spent','contaminated'].includes(b.phase)
+        ? Math.ceil((100 - b.progress) / 100 * b.duration) + 'sn'
+        : '';
+      const risk = currentContamRisk(b);
+
+      let actions = '';
+      if (b.phase === 'cooled') actions += `<button class="btn btn-green" data-action="inoculate" data-id="${b.id}">Misel Ek (0.3 kg)</button>`;
+      if (b.phase === 'ready')  actions += `<button class="btn btn-green" data-action="harvest" data-id="${b.id}">Hasat Et</button>`;
+      if (isSpent) actions += `<button class="btn btn-green" data-action="manualRestart" data-id="${b.id}">Yeniden Başlat</button>`;
+      if (['spent','contaminated'].includes(b.phase)) actions += `<button class="btn btn-danger" data-action="remove" data-id="${b.id}">Kaldır</button>`;
+
+      html += `
+        <div class="batch ${isBad?'contaminated':''} ${isReady?'ready':''}" data-id="${b.id}">
+          <div class="batch-head">
+            <span class="title">Parti · Flaş ${b.flush}/3 · K${b.containerId}</span>
+            <span class="phase ${isBad?'bad':''}">${ph.label}</span>
+          </div>
+          <div class="bar"><div class="fill ${isBad?'bad':''}" style="width:${b.progress||0}%"></div></div>
+          <div class="batch-info">
+            <span>${METHODS[b.method].name} · Risk %${Math.round(risk*100)}</span>
+            <span>${timeLeft}</span>
+          </div>
+          <div class="batch-log">${b.logs[b.logs.length-1] || ''}</div>
+          <div class="batch-actions">${actions}</div>
+        </div>
+      `;
+    });
+  }
 
   tabContent.innerHTML = html;
 }
@@ -509,10 +587,12 @@ export function renderUstalar() {
       Günlük maaş: <b>₺${totalSalary}</b>${state.money < totalSalary ? ' · ⚠️ Bakiye düşük!' : ''}
     </div>`;
   } else {
-    html += `<div class="hint">Usta kiralamadın. Ustalar misel ekme ve hasat işlerini otomatikleştirir.</div>`;
+    html += `<div class="hint">Usta kiralamadın. Ustalar misel ekme ve hasat işlerini otomatikleştirir. Kontamine kompostları da temizler.</div>`;
+  }
+  if (state.masters.length > 0) {
+    html += `<div class="hint">Ustalar kontamine partileri otomatik temizler. Aşılama ustası misel yoksa kendi satın alır.</div>`;
   }
 
-  // Usta davranışı
   html += `<div style="font-family:var(--font-head);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green-bright);margin:14px 0 8px">Usta Davranışı</div>`;
   html += `
     <div class="setting-row">
@@ -533,7 +613,6 @@ export function renderUstalar() {
     </div>
   `;
 
-  // Kiralanan
   html += `<div style="font-family:var(--font-head);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green-bright);margin:14px 0 8px">Kiralanan (${state.masters.length})</div>`;
   if (state.masters.length === 0) {
     html += `<div style="font-size:0.72rem;color:var(--muted);padding:8px 0">Henüz usta yok.</div>`;
@@ -563,7 +642,6 @@ export function renderUstalar() {
     });
   }
 
-  // Havuz
   const nextRefresh = state.lastMasterRefreshDay + 7 - state.day;
   html += `<div style="font-family:var(--font-head);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green-bright);margin:18px 0 4px">Kiralık Ustalar</div>`;
   html += `<div style="font-size:0.66rem;color:var(--muted);margin-bottom:10px">Yenilenmeye <b>${Math.max(0, nextRefresh)} gün</b> (her 7 gün).</div>`;
@@ -597,7 +675,6 @@ export function renderUstalar() {
 
   tabContent.innerHTML = html;
 
-  // Wire up settings
   const rs = document.getElementById('settingRestart');
   const ms = document.getElementById('settingMethod');
   if (rs) {
@@ -608,50 +685,6 @@ export function renderUstalar() {
     ms.value = state.masterMethod || 'hot';
     ms.addEventListener('change', e => { state.masterMethod = e.target.value; save(); });
   }
-}
-
-export function renderKonteyner() {
-  let html = `<div class="section-head"><h2>Konteyner</h2></div>`;
-  html += `<div class="hint">Her konteyner bağımsız yükseltilir. Yeni konteyner L1'den başlar.</div>`;
-
-  state.containers.forEach(c => {
-    const lvl = CONTAINER_LEVELS[c.level];
-    const next = CONTAINER_LEVELS[c.level + 1];
-    const active = activeSubstrateIn(c.id);
-    html += `
-      <div class="container-card">
-        <h3>Konteyner #${c.id}</h3>
-        <span class="lvl">${lvl.name} · Sv.${c.level}/${CONTAINER_LEVELS.length - 1}</span>
-        <div class="stat-grid">
-          <div class="stat-cell"><div class="k">Substrat</div><div class="v">${active}/${lvl.capacity} kg</div></div>
-          <div class="stat-cell"><div class="k">Depo</div><div class="v">${lvl.storage} kg</div></div>
-          <div class="stat-cell"><div class="k">İklim</div><div class="v">%${Math.round(lvl.climate*100)}</div></div>
-          <div class="stat-cell"><div class="k">Fiyat Bonusu</div><div class="v">+%${Math.round(lvl.priceBonus*100)}</div></div>
-        </div>
-        ${next ? `
-          <div class="upgrade-box">
-            <h4>${next.name}</h4>
-            <p>Kapasite ${next.capacity} kg · Depo ${next.storage} kg · İklim %${Math.round(next.climate*100)}${next.priceBonus?' · Fiyat +%'+Math.round(next.priceBonus*100):''}</p>
-            <div class="cost">${fmtMoney(next.cost)}</div>
-            <button class="btn btn-green" data-action="upgradeContainer" data-id="${c.id}">Yükselt</button>
-          </div>
-        ` : `<div class="hint">Maksimum seviyede.</div>`}
-      </div>
-    `;
-  });
-
-  if (state.containers.length < MAX_CONTAINERS) {
-    html += `
-      <div class="upgrade-box" style="margin-top:14px">
-        <h4>+ Yeni Konteyner (${state.containers.length}/${MAX_CONTAINERS})</h4>
-        <p>L1 temel konteyner. 50 kg substrat. Ayrıca yükseltilir.</p>
-        <div class="cost">${fmtMoney(NEW_CONTAINER_COST)}</div>
-        <button class="btn btn-green" data-action="buyContainer">Satın Al</button>
-      </div>
-    `;
-  }
-
-  tabContent.innerHTML = html;
 }
 
 export function renderDepo() {
@@ -733,6 +766,14 @@ export function setupEvents() {
   });
 
   tabContent.addEventListener('click', (e) => {
+    // Konteyner çipi seçimi
+    const chip = e.target.closest('.container-chip[data-container]');
+    if (chip) {
+      selectedContainerId = parseInt(chip.dataset.container);
+      renderUretim();
+      return;
+    }
+
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const a = btn.dataset.action;
@@ -786,8 +827,11 @@ export function setupEvents() {
   document.getElementById('resetBtn').addEventListener('click', () => {
     if (!confirm('Tüm ilerleme silinecek. Emin misin?')) return;
     resetState();
+    selectedContainerId = 1;
     render();
   });
+
+  if (fabBtn) fabBtn.addEventListener('click', () => openNewBatch());
 }
 
 export function setSpeed(s) {
@@ -805,6 +849,7 @@ function startInterval() {
 /* ---------- INIT ---------- */
 export function init() {
   load();
+  if (state.containers.length > 0) selectedContainerId = state.containers[0].id;
   render();
   setupEvents();
   startInterval();
