@@ -1,5 +1,5 @@
 export const SAVE_KEY = 'florod_mushroom_v5';
-export const START_MONEY = 100000000;
+export const START_MONEY = 25000;
 export const BATCH_WEIGHT = 10;
 export const MAX_CONTAINERS = 5;
 export const NEW_CONTAINER_COST = 30000;
