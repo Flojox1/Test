@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#08080a" />
+<title>FloRod — Flo Diyarı</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #08080a; --surface: #101014; --surface-2: #17171d;
+    --text: #e6e2d8; --muted: #7d7a72; --border: #232329;
+    --kenar: #4a7a3a; --merkez: #c99a2e; --sanayi: #7a7a82; --magara: #7a4a9a;
+    --accent: #b02525;
+    --font-head: 'Cinzel', serif; --font-body: 'Inter', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text); font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased; overflow: hidden;
+    display: flex; flex-direction: column; height: 100dvh;
+  }
+
+  /* HUD */
+  .hud {
+    flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; padding-top: calc(10px + env(safe-area-inset-top));
+    border-bottom: 1px solid var(--border);
+    background: rgba(16,16,20,0.95); z-index: 5;
+  }
+  .stat {
+    display: flex; flex-direction: column; padding: 4px 10px;
+    border-radius: 4px; background: var(--surface-2);
+    min-width: 0; flex: 1; max-width: 140px;
+  }
+  .stat .lbl {
+    font-size: 0.55rem; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .stat .val {
+    font-family: var(--font-head); font-size: 0.95rem; font-weight: 700;
+    color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .stat .val.gold { color: #e8c56a; }
+  .stat .val.green { color: #7ac07a; }
+  .hud-spacer { flex: 1; }
+  .hud-btn {
+    flex-shrink: 0; padding: 8px 12px; background: transparent;
+    color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
+    font-family: var(--font-body); font-size: 0.7rem; letter-spacing: 1px;
+    text-transform: uppercase; cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hud-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* LEGEND */
+  .legend {
+    flex-shrink: 0; display: flex; justify-content: center; flex-wrap: wrap;
+    gap: 6px; padding: 8px 12px; font-size: 0.6rem;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--muted); border-bottom: 1px solid var(--border);
+  }
+  .legend span {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px; border-radius: 3px; background: var(--surface-2);
+  }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+  /* MAP */
+  .map-wrap {
+    flex: 1; min-height: 0; display: flex;
+    align-items: center; justify-content: center;
+    padding: 12px; overflow: hidden;
+  }
+  .map {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 3px; width: min(100%, 720px); aspect-ratio: 12 / 8; max-height: 100%;
+  }
+  .cell {
+    position: relative; border-radius: 3px; background: var(--surface-2);
+    border: 1px solid var(--border); cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.2s, background 0.2s;
+    -webkit-tap-highlight-color: transparent; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    font-size: clamp(0.8rem, 3vw, 1.4rem);
+  }
+  .cell:hover { transform: scale(1.06); z-index: 2; }
+  .cell:active { transform: scale(0.96); }
+  .cell.kenar  { background: rgba(74,122,58,0.12);  border-color: rgba(74,122,58,0.35); }
+  .cell.merkez { background: rgba(201,154,46,0.12); border-color: rgba(201,154,46,0.35); }
+  .cell.sanayi { background: rgba(122,122,130,0.12); border-color: rgba(122,122,130,0.35); }
+  .cell.magara { background: rgba(122,74,154,0.12); border-color: rgba(122,74,154,0.35); }
+  .cell.owned { background: var(--surface); border-width: 2px; }
+  .cell.owned.kenar  { border-color: var(--kenar);  box-shadow: inset 0 0 8px rgba(74,122,58,0.4); }
+  .cell.owned.merkez { border-color: var(--merkez); box-shadow: inset 0 0 8px rgba(201,154,46,0.4); }
+  .cell.owned.sanayi { border-color: var(--sanayi); box-shadow: inset 0 0 8px rgba(122,122,130,0.4); }
+  .cell.owned.magara { border-color: var(--magara); box-shadow: inset 0 0 8px rgba(122,74,154,0.4); }
+  .cell .lvl {
+    position: absolute; bottom: 1px; right: 2px;
+    font-size: 0.55rem; font-weight: 700; color: var(--text);
+    background: rgba(0,0,0,0.7); padding: 0 3px; border-radius: 2px;
+    letter-spacing: 0.5px;
+  }
+
+  /* MODAL */
+  .modal-back {
+    position: fixed; inset: 0; z-index: 20;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-back.on { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 26px 22px; width: 100%; max-width: 420px;
+    max-height: 90vh; overflow-y: auto; animation: pop 0.2s ease both;
+  }
+  @keyframes pop {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .modal h2 {
+    font-family: var(--font-head); font-size: 1.2rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
+  }
+  .modal .zone-name {
+    font-size: 0.66rem; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 18px; display: block;
+  }
+  .modal .balance { font-size: 0.8rem; color: var(--muted); margin-bottom: 18px; }
+  .modal .balance b { color: #e8c56a; font-family: var(--font-head); }
+  .option {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 4px; margin-bottom: 8px; cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .option:hover { border-color: var(--accent); background: var(--surface); }
+  .option.disabled { opacity: 0.4; cursor: not-allowed; }
+  .option.disabled:hover { border-color: var(--border); background: var(--surface-2); }
+  .option .ico { font-size: 1.6rem; flex-shrink: 0; }
+  .option .info { flex: 1; min-width: 0; }
+  .option .info .name {
+    font-family: var(--font-head); font-weight: 700; font-size: 0.95rem;
+    text-transform: uppercase; letter-spacing: 0.5px; display: block;
+  }
+  .option .info .desc { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+  .option .info .desc b { color: #7ac07a; }
+  .option .price {
+    font-family: var(--font-head); font-weight: 700; font-size: 0.9rem;
+    color: #e8c56a; white-space: nowrap;
+  }
+  .option .price.poor { color: var(--accent); }
+  .modal .close {
+    margin-top: 14px; width: 100%; padding: 12px; background: transparent;
+    color: var(--muted); border: 1px solid var(--border); border-radius: 4px;
+    font-family: var(--font-body); font-size: 0.78rem; letter-spacing: 2px;
+    text-transform: uppercase; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .modal .close:hover { color: var(--text); border-color: var(--muted); }
+  .modal .upgrade-info {
+    display: flex; justify-content: space-between;
+    padding: 10px 0; border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); margin-bottom: 14px;
+    font-size: 0.78rem; color: var(--muted);
+  }
+  .modal .upgrade-info b { color: var(--text); font-family: var(--font-head); }
+
+  /* CHAT */
+  .chat-toggle {
+    position: fixed;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    right: 20px; width: 56px; height: 56px;
+    border-radius: 50%; background: var(--accent);
+    border: none; color: #fff; font-size: 1.4rem;
+    cursor: pointer; z-index: 15;
+    box-shadow: 0 4px 20px rgba(176,37,37,0.4);
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chat-toggle:active { transform: scale(0.92); }
+  .chat-toggle .badge {
+    position: absolute; top: -2px; right: -2px;
+    min-width: 18px; height: 18px; border-radius: 9px;
+    background: #4a7a3a; color: #fff; font-size: 0.6rem;
+    font-weight: 700; display: none;
+    align-items: center; justify-content: center; padding: 0 5px;
+  }
+  .chat-toggle .badge.on { display: flex; }
+
+  .chat-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 380px; max-width: 100vw;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 16; display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .chat-panel.open { transform: translateX(0); }
+  .chat-head {
+    flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    font-family: var(--font-head); font-size: 0.95rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .chat-head .online {
+    font-family: var(--font-body); font-size: 0.6rem;
+    letter-spacing: 1px; color: var(--muted);
+    text-transform: none; font-weight: 500;
+  }
+  .chat-head .online::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: #4a7a3a; margin-right: 5px;
+    vertical-align: middle;
+  }
+  .chat-head .online.off::before { background: var(--accent); }
+  .chat-close {
+    background: transparent; border: none; color: var(--muted);
+    font-size: 1.4rem; cursor: pointer; line-height: 1;
+    -webkit-tap-highlight-color: transparent; padding: 0 6px;
+  }
+  .chat-close:hover { color: var(--text); }
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chat-empty {
+    text-align: center; color: var(--muted); font-size: 0.78rem;
+    margin-top: 40px; padding: 0 20px;
+  }
+  .msg { display: flex; flex-direction: column; max-width: 85%; }
+  .msg.self { align-self: flex-end; align-items: flex-end; }
+  .msg .who {
+    font-size: 0.62rem; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
+    padding: 0 4px;
+  }
+  .msg.self .who { color: var(--accent); }
+  .msg .body {
+    background: var(--surface-2); border: 1px solid var(--border);
+    padding: 7px 11px; border-radius: 8px;
+    font-size: 0.82rem; line-height: 1.4; word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+  .msg.self .body {
+    background: rgba(176,37,37,0.15); border-color: rgba(176,37,37,0.4);
+  }
+  .msg .time {
+    font-size: 0.55rem; color: var(--muted); margin-top: 2px; padding: 0 4px;
+  }
+  .chat-form {
+    flex-shrink: 0; display: flex; gap: 6px; padding: 10px 12px;
+    border-top: 1px solid var(--border); background: var(--surface);
+  }
+  .chat-form input {
+    flex: 1; padding: 10px 12px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font-family: var(--font-body); font-size: 0.85rem;
+    outline: none; min-width: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .chat-form input:focus { border-color: var(--accent); }
+  .chat-form input::placeholder { color: var(--muted); }
+  .chat-form input:disabled { opacity: 0.5; }
+  .chat-form button {
+    padding: 10px 16px; background: var(--accent); color: #fff;
+    border: none; border-radius: 4px;
+    font-family: var(--font-body); font-size: 0.75rem;
+    font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s;
+  }
+  .chat-form button:hover { background: #c93030; }
+  .chat-form button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  @media (max-width: 520px) {
+    .stat { padding: 3px 8px; }
+    .stat .val { font-size: 0.85rem; }
+    .stat .lbl { font-size: 0.5rem; }
+    .hud-btn { padding: 6px 10px; font-size: 0.6rem; }
+    .map { gap: 2px; }
+    .modal { padding: 22px 18px; }
+    .chat-panel { width: 100vw; }
+  }
+</style>
+</head>
+<body>
+
+<header class="hud">
+  <div class="stat">
+    <span class="lbl">Para</span>
+    <span class="val gold" id="statMoney">$0</span>
+  </div>
+  <div class="stat">
+    <span class="lbl">Gelir</span>
+    <span class="val green" id="statIncome">$0/sn</span>
+  </div>
+  <div class="stat">
+    <span class="lbl">Arsa</span>
+    <span class="val" id="statPlots">0/96</span>
+  </div>
+  <div class="hud-spacer"></div>
+  <button class="hud-btn" id="resetBtn" type="button">Sıfırla</button>
+</header>
+
+<div class="legend">
+  <span><i style="background:#4a7a3a"></i>Kenar</span>
+  <span><i style="background:#c99a2e"></i>Merkez</span>
+  <span><i style="background:#7a7a82"></i>Sanayi</span>
+  <span><i style="background:#7a4a9a"></i>Mağara</span>
+</div>
+
+<main class="map-wrap">
+  <div class="map" id="map"></div>
+</main>
+
+<div class="modal-back" id="modalBack">
+  <div class="modal" id="modal"></div>
+</div>
+
+<!-- CHAT -->
+<button class="chat-toggle" id="chatToggle" aria-label="Sohbet">
+  💬<span class="badge" id="chatBadge"></span>
+</button>
+<aside class="chat-panel" id="chatPanel">
+  <div class="chat-head">
+    <span>Flo Diyarı Sohbet</span>
+    <span class="online off" id="chatStatus">Bağlanıyor...</span>
+    <button class="chat-close" id="chatClose" aria-label="Kapat">×</button>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-empty" id="chatEmpty">
+      Henüz mesaj yok. İlk konuşan sen ol.
+    </div>
+  </div>
+  <form class="chat-form" id="chatForm">
+    <input type="text" id="chatInput" placeholder="Mesaj yaz..." maxlength="200" autocomplete="off" disabled />
+    <button type="submit" id="chatSend" disabled>Gönder</button>
+  </form>
+</aside>
+
+<script type="module">
+  // ================== OYUN ==================
+  const COLS = 12, ROWS = 8;
+  const SAVE_KEY = 'florod_save_v1';
+  const START_MONEY = 1000;
+
+  function zoneOf(x, y) {
+    if (y < ROWS / 2) return x < COLS / 2 ? 'kenar' : 'merkez';
+    return x < COLS / 2 ? 'sanayi' : 'magara';
+  }
+  const ZONE_NAMES = { kenar: 'Kenar', merkez: 'Merkez', sanayi: 'Sanayi', magara: 'Mağara' };
+
+  const PROFS = {
+    ciftlik:   { name: 'Çiftlik',        icon: '🌾', cost: 300,  income: 1.0, region: 'kenar' },
+    mantarhane:{ name: 'Mantarhane',     icon: '🍄', cost: 150,  income: 0.5, region: 'kenar' },
+    kafe:      { name: 'Kafe',           icon: '☕', cost: 500,  income: 2.0, region: 'merkez' },
+    firin:     { name: 'Fırın',          icon: '🍞', cost: 350,  income: 1.2, region: 'merkez' },
+    petrol:    { name: 'Petrol',         icon: '🛢️', cost: 2000, income: 8.0, region: 'sanayi' },
+    atolye:    { name: 'Atölye',         icon: '⚙️', cost: 800,  income: 4.0, region: 'sanayi' },
+    mantarM:   { name: 'Mantar Mağarası',icon: '🍄', cost: 200,  income: 0.8, region: 'magara' },
+    maden:     { name: 'Maden',          icon: '⛏️', cost: 1200, income: 3.0, region: 'magara' }
+  };
+  const PROFS_BY_ZONE = {
+    kenar: ['ciftlik', 'mantarhane'],
+    merkez: ['kafe', 'firin'],
+    sanayi: ['petrol', 'atolye'],
+    magara: ['mantarM', 'maden']
+  };
+
+  let state = { money: START_MONEY, lastTick: Date.now(), plots: {} };
+
+  function save() {
+    try {
+      state.lastTick = Date.now();
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.money === 'number' && parsed.plots) {
+        state = parsed;
+        const elapsed = Math.max(0, (Date.now() - (state.lastTick || Date.now())) / 1000);
+        const offline = totalIncome() * elapsed;
+        if (offline > 0) state.money += offline;
+      }
+    } catch (e) {}
+    state.lastTick = Date.now();
+  }
+
+  function plotIncome(plot) {
+    const p = PROFS[plot.prof];
+    if (!p) return 0;
+    return p.income * Math.pow(1.2, plot.level - 1);
+  }
+  function totalIncome() {
+    let t = 0;
+    for (const k in state.plots) t += plotIncome(state.plots[k]);
+    return t;
+  }
+  function upgradeCost(plot) {
+    const p = PROFS[plot.prof];
+    return Math.floor(p.cost * 1.5 * Math.pow(1.5, plot.level - 1));
+  }
+  function fmt(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return Math.floor(n).toString();
+  }
+
+  const mapEl = document.getElementById('map');
+  const statMoney = document.getElementById('statMoney');
+  const statIncome = document.getElementById('statIncome');
+  const statPlots = document.getElementById('statPlots');
+  const modalBack = document.getElementById('modalBack');
+  const modalEl = document.getElementById('modal');
+
+  function render() {
+    mapEl.innerHTML = '';
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const zone = zoneOf(x, y);
+        const id = x + '-' + y;
+        const plot = state.plots[id];
+        const cell = document.createElement('div');
+        cell.className = 'cell ' + zone + (plot ? ' owned' : '');
+        cell.dataset.id = id;
+        if (plot) {
+          const p = PROFS[plot.prof];
+          cell.textContent = p ? p.icon : '?';
+          if (plot.level > 1) {
+            const lvl = document.createElement('span');
+            lvl.className = 'lvl';
+            lvl.textContent = 'Lv' + plot.level;
+            cell.appendChild(lvl);
+          }
+        }
+        cell.addEventListener('click', () => openPlot(id));
+        mapEl.appendChild(cell);
+      }
+    }
+    statMoney.textContent = '$' + fmt(state.money);
+    statIncome.textContent = '$' + totalIncome().toFixed(1) + '/sn';
+    statPlots.textContent = Object.keys(state.plots).length + '/' + (COLS * ROWS);
+  }
+
+  function openPlot(id) {
+    const [x, y] = id.split('-').map(Number);
+    const zone = zoneOf(x, y);
+    const plot = state.plots[id];
+    if (plot) openOwned(id, plot, zone);
+    else openClaim(id, zone);
+  }
+
+  function openClaim(id, zone) {
+    const options = PROFS_BY_ZONE[zone];
+    modalEl.innerHTML = `
+      <h2>Arsa Sahiplen</h2>
+      <span class="zone-name">${ZONE_NAMES[zone]} Bölgesi</span>
+      <div class="balance">Bakiyen: <b>$${fmt(state.money)}</b></div>
+      <div id="options"></div>
+      <button class="close" id="closeBtn">Kapat</button>
+    `;
+    const optWrap = modalEl.querySelector('#options');
+    options.forEach(key => {
+      const p = PROFS[key];
+      const canAfford = state.money >= p.cost;
+      const div = document.createElement('div');
+      div.className = 'option' + (canAfford ? '' : ' disabled');
+      div.innerHTML = `
+        <div class="ico">${p.icon}</div>
+        <div class="info">
+          <span class="name">${p.name}</span>
+          <div class="desc">Gelir: <b>+$${p.income}/sn</b></div>
+        </div>
+        <div class="price ${canAfford ? '' : 'poor'}">$${fmt(p.cost)}</div>
+      `;
+      if (canAfford) {
+        div.addEventListener('click', () => {
+          state.money -= p.cost;
+          state.plots[id] = { prof: key, level: 1 };
+          save(); closeModal(); render();
+        });
+      }
+      optWrap.appendChild(div);
+    });
+    modalEl.querySelector('#closeBtn').addEventListener('click', closeModal);
+    modalBack.classList.add('on');
+  }
+
+  function openOwned(id, plot, zone) {
+    const p = PROFS[plot.prof];
+    const inc = plotIncome(plot);
+    const cost = upgradeCost(plot);
+    const canUpgrade = state.money >= cost;
+    modalEl.innerHTML = `
+      <h2>${p.icon} ${p.name}</h2>
+      <span class="zone-name">${ZONE_NAMES[zone]} · Seviye ${plot.level}</span>
+      <div class="upgrade-info">
+        <span>Mevcut: <b>+$${inc.toFixed(1)}/sn</b></span>
+        <span>Sonraki: <b>+$${(inc * 1.2).toFixed(1)}/sn</b></span>
+      </div>
+      <div class="option ${canUpgrade ? '' : 'disabled'}" id="upgBtn">
+        <div class="ico">⬆️</div>
+        <div class="info">
+          <span class="name">Yükselt</span>
+          <div class="desc">+20% gelir, seviye artar</div>
+        </div>
+        <div class="price ${canUpgrade ? '' : 'poor'}">$${fmt(cost)}</div>
+      </div>
+      <button class="close" id="closeBtn">Kapat</button>
+    `;
+    if (canUpgrade) {
+      modalEl.querySelector('#upgBtn').addEventListener('click', () => {
+        state.money -= cost;
+        plot.level += 1;
+        save(); closeModal(); render();
+      });
+    }
+    modalEl.querySelector('#closeBtn').addEventListener('click', closeModal);
+    modalBack.classList.add('on');
+  }
+
+  function closeModal() { modalBack.classList.remove('on'); }
+  modalBack.addEventListener('click', (e) => {
+    if (e.target === modalBack) closeModal();
+  });
+
+  function tick() {
+    const now = Date.now();
+    const dt = Math.max(0, (now - state.lastTick) / 1000);
+    state.money += totalIncome() * dt;
+    state.lastTick = now;
+    statMoney.textContent = '$' + fmt(state.money);
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if (!confirm('Tüm ilerleme silinecek. Emin misin?')) return;
+    localStorage.removeItem(SAVE_KEY);
+    state = { money: START_MONEY, lastTick: Date.now(), plots: {} };
+    save(); render();
+  });
+
+  load();
+  render();
+  setInterval(tick, 250);
+  setInterval(save, 5000);
+  window.addEventListener('beforeunload', save);
+
+  // ================== SOHBET ==================
+  // >>> BURAYA KENDİ FIREBASE CONFIG'İNİ YAPIŞTIR <<<
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  const chatEnabled = !firebaseConfig.apiKey.startsWith("YOUR_");
+
+  const chatToggle = document.getElementById('chatToggle');
+  const chatPanel = document.getElementById('chatPanel');
+  const chatClose = document.getElementById('chatClose');
+  const chatForm = document.getElementById('chatForm');
+  const chatInput = document.getElementById('chatInput');
+  const chatSend = document.getElementById('chatSend');
+  const chatMessages = document.getElementById('chatMessages');
+  const chatStatus = document.getElementById('chatStatus');
+  const chatBadge = document.getElementById('chatBadge');
+
+  let chatOpen = false;
+  let unread = 0;
+  let myName = localStorage.getItem('florod_name') || '';
+  let firstLoad = true;
+
+  function refreshBadge() {
+    if (unread > 0 && !chatOpen) {
+      chatBadge.textContent = unread > 99 ? '99+' : unread;
+      chatBadge.classList.add('on');
+    } else {
+      chatBadge.classList.remove('on');
+    }
+  }
+
+  chatToggle.addEventListener('click', () => {
+    chatOpen = !chatOpen;
+    chatPanel.classList.toggle('open', chatOpen);
+    if (chatOpen) {
+      unread = 0;
+      refreshBadge();
+      chatInput.focus();
+      scrollChatBottom();
+    }
+  });
+  chatClose.addEventListener('click', () => {
+    chatOpen = false;
+    chatPanel.classList.remove('open');
+    refreshBadge();
+  });
+
+  function scrollChatBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function addMessage(msg, isSelf) {
+    const empty = chatMessages.querySelector('.chat-empty');
+    if (empty) empty.remove();
+
+    const div = document.createElement('div');
+    div.className = 'msg' + (isSelf ? ' self' : '');
+
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = isSelf ? 'Sen' : (msg.name || 'Anonim');
+
+    const body = document.createElement('div');
+    body.className = 'body';
+    body.textContent = msg.text || '';   // textContent → XSS güvenli
+
+    const time = document.createElement('span');
+    time.className = 'time';
+    const d = new Date(msg.ts || Date.now());
+    time.textContent = d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+
+    div.appendChild(who);
+    div.appendChild(body);
+    div.appendChild(time);
+    chatMessages.appendChild(div);
+
+    if (!firstLoad && !chatOpen && !isSelf) {
+      unread++;
+      refreshBadge();
+    }
+    scrollChatBottom();
+  }
+
+  async function initChat() {
+    if (!chatEnabled) {
+      chatStatus.textContent = 'Kapalı';
+      chatStatus.classList.add('off');
+      chatInput.placeholder = 'Sohbet yapılandırılmadı';
+      return;
+    }
+
+    try {
+      const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+      const { getDatabase, ref, push, onChildAdded, query, limitToLast, serverTimestamp } =
+        await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+
+      chatStatus.textContent = 'Bağlı';
+      chatStatus.classList.remove('off');
+      chatInput.disabled = false;
+      chatSend.disabled = false;
+
+      const chatRef = query(ref(db, 'chat'), limitToLast(50));
+      onChildAdded(chatRef, (snap) => {
+        const msg = snap.val();
+        if (!msg) return;
+        // kendi mesajımızı geçmiş yüklemede "self" göstermek için isim kontrolü
+        const isSelf = msg.name === myName;
+        addMessage(msg, isSelf);
+      });
+
+      // İlk yüklemeden sonra "unread" saymaya başla
+      setTimeout(() => { firstLoad = false; }, 1500);
+
+      chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        if (!myName) {
+          const entered = prompt('Sohbette görünecek adın:');
+          if (!entered || !entered.trim()) return;
+          myName = entered.trim().slice(0, 20);
+          localStorage.setItem('florod_name', myName);
+        }
+
+        chatInput.value = '';
+        try {
+          await push(ref(db, 'chat'), {
+            name: myName,
+            text: text.slice(0, 200),
+            ts: Date.now()
+          });
+        } catch (err) {
+          alert('Mesaj gönderilemedi: ' + err.message);
+        }
+      });
+
+    } catch (err) {
+      chatStatus.textContent = 'Hata';
+      chatStatus.classList.add('off');
+      console.error('Chat init error:', err);
+    }
+  }
+
+  initChat();
+</script>
+
+</body>
+</html>
