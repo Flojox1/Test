@@ -24,7 +24,6 @@
     display:flex; flex-direction:column; height:100dvh;
   }
 
-  /* HUD */
   .hud {
     flex-shrink:0; display:flex; align-items:center; gap:6px;
     padding:8px 10px; padding-top:calc(8px + env(safe-area-inset-top));
@@ -39,7 +38,6 @@
   .stat .val { font-family:var(--font-head); font-size:0.85rem; font-weight:700; white-space:nowrap; }
   .val.gold { color:var(--gold); }
   .val.green { color:var(--green-bright); }
-  .val.danger { color:var(--danger-bright); }
   .hud-spacer { flex:1; min-width:4px; }
   #resetBtn {
     flex-shrink:0; padding:7px 10px; background:transparent; color:var(--muted);
@@ -49,7 +47,6 @@
   }
   #resetBtn:hover { color:var(--danger-bright); border-color:var(--danger); }
 
-  /* TABS */
   .tabs {
     flex-shrink:0; display:flex; border-bottom:1px solid var(--border);
     background:var(--surface); overflow-x:auto; -webkit-overflow-scrolling:touch;
@@ -65,7 +62,6 @@
   .tab.active { color:var(--green-bright); border-bottom-color:var(--green-bright); }
   .tab:hover { color:var(--text); }
 
-  /* CONTENT */
   .content { flex:1; min-height:0; overflow-y:auto; padding:12px; -webkit-overflow-scrolling:touch; }
 
   .section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:8px; }
@@ -91,7 +87,6 @@
   }
   .hint b { color:var(--text); }
 
-  /* BATCH */
   .batch {
     background:var(--surface); border:1px solid var(--border);
     border-radius:5px; padding:12px; margin-bottom:10px;
@@ -110,19 +105,56 @@
   .batch-actions { display:flex; gap:6px; flex-wrap:wrap; }
   .batch-actions .btn { padding:8px 12px; font-size:0.64rem; }
 
-  /* MARKET */
-  .mat-list { display:flex; flex-direction:column; gap:8px; }
+  .mat-list { display:flex; flex-direction:column; gap:10px; }
   .mat {
-    display:flex; align-items:center; gap:10px; background:var(--surface);
-    border:1px solid var(--border); border-radius:5px; padding:10px 12px;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:5px; padding:10px 12px;
   }
-  .mat .ico { font-size:1.4rem; flex-shrink:0; }
-  .mat .info { flex:1; min-width:0; }
-  .mat .info .name { font-family:var(--font-head); font-size:0.82rem; font-weight:700; }
-  .mat .info .sub { font-size:0.62rem; color:var(--muted); }
-  .mat .own { font-family:var(--font-head); font-size:0.8rem; color:var(--green-bright); font-weight:700; white-space:nowrap; }
-  .buy-btns { display:flex; gap:4px; flex-shrink:0; }
-  .buy-btns .btn { padding:7px 9px; font-size:0.62rem; }
+  .mat-main { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .mat-main .ico { font-size:1.4rem; flex-shrink:0; }
+  .mat-main .info { flex:1; min-width:0; }
+  .mat-main .info .name { font-family:var(--font-head); font-size:0.82rem; font-weight:700; }
+  .mat-main .info .sub { font-size:0.62rem; color:var(--muted); }
+  .mat-main .own { font-family:var(--font-head); font-size:0.78rem; color:var(--green-bright); font-weight:700; white-space:nowrap; }
+  .mat-controls { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .mat-controls .btn { padding:7px 10px; font-size:0.62rem; flex-shrink:0; }
+  .qty-input {
+    flex:1; min-width:70px; padding:7px 10px; background:var(--surface-2);
+    border:1px solid var(--border); border-radius:4px;
+    color:var(--text); font-family:var(--font-body); font-size:0.72rem;
+    outline:none;
+  }
+  .qty-input:focus { border-color:var(--green); }
+  .qty-input::placeholder { color:var(--muted); font-size:0.65rem; }
+
+  .cart-box {
+    background:var(--surface); border:1px solid var(--green);
+    border-radius:5px; padding:14px; margin-top:14px;
+  }
+  .cart-box h3 {
+    font-family:var(--font-head); font-size:0.9rem; text-transform:uppercase;
+    letter-spacing:1px; margin-bottom:10px; color:var(--green-bright);
+  }
+  .cart-row {
+    display:flex; align-items:center; gap:8px;
+    font-size:0.72rem; padding:7px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .cart-row span:first-child { flex:1; }
+  .cart-row span:nth-child(2) { color:var(--gold); font-family:var(--font-head); font-weight:700; }
+  .cart-rm {
+    background:transparent; border:none; color:var(--muted);
+    font-size:1.15rem; cursor:pointer; padding:0 4px; line-height:1;
+  }
+  .cart-rm:hover { color:var(--danger-bright); }
+  .cart-total {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:12px 0 6px;
+  }
+  .cart-total span:first-child { font-size:0.7rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .cart-total .big { font-family:var(--font-head); font-size:1.2rem; color:var(--gold); font-weight:700; }
+  .cart-btns { display:flex; gap:8px; margin-top:8px; }
+  .cart-btns .btn { flex:1; }
 
   .sell-box {
     background:var(--surface); border:1px solid var(--border); border-radius:5px;
@@ -132,7 +164,6 @@
   .sell-row { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
   .sell-row .big { font-family:var(--font-head); font-size:1.2rem; color:var(--gold); font-weight:700; }
 
-  /* CONTAINER */
   .container-card {
     background:var(--surface); border:1px solid var(--border); border-radius:6px;
     padding:16px; margin-bottom:14px;
@@ -148,11 +179,9 @@
   .upgrade-box p { font-size:0.72rem; color:var(--muted); line-height:1.5; margin-bottom:10px; }
   .upgrade-box .cost { font-family:var(--font-head); color:var(--gold); font-weight:700; font-size:0.95rem; margin-bottom:10px; }
 
-  /* STORAGE */
   .storage-bar { height:10px; background:var(--surface-2); border-radius:5px; overflow:hidden; margin:8px 0 14px; }
   .storage-bar .fill { height:100%; background:var(--gold); border-radius:5px; transition:width 0.3s; }
 
-  /* MODAL */
   .modal-back {
     position:fixed; inset:0; z-index:30; background:rgba(0,0,0,0.8);
     backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; padding:16px;
@@ -188,7 +217,6 @@
   .m-risk.high { color:var(--danger-bright); }
   .modal .close { margin-top:10px; width:100%; padding:11px; background:transparent; color:var(--muted); border:1px solid var(--border); border-radius:4px; font-family:var(--font-body); font-size:0.72rem; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; }
 
-  /* CHAT */
   .chat-toggle {
     position:fixed; bottom:calc(18px + env(safe-area-inset-bottom)); right:16px;
     width:52px; height:52px; border-radius:50%; background:var(--green);
@@ -265,7 +293,6 @@
   <div class="modal" id="modal"></div>
 </div>
 
-<!-- CHAT -->
 <button class="chat-toggle" id="chatToggle" aria-label="Sohbet">💬<span class="badge" id="chatBadge"></span></button>
 <aside class="chat-panel" id="chatPanel">
   <div class="chat-head">
@@ -286,9 +313,9 @@
 /* ============================================================
    SABİTLER
 ============================================================ */
-const SAVE_KEY = 'florod_mushroom_v2';
+const SAVE_KEY = 'florod_mushroom_v3';
 const START_MONEY = 2500;
-const BATCH_WEIGHT = 10; // kg substrat / parti
+const BATCH_WEIGHT = 10;
 
 const MATERIALS = {
   straw:  { name:'Buğday Samanı',  unit:'kg',   price:5,   icon:'🌾' },
@@ -340,12 +367,10 @@ let state = {
   batches: [],
   containerLevel: 1,
   marketPrice: 165,
+  cart: {},
   lastTick: Date.now()
 };
 
-/* ============================================================
-   KAYIT
-============================================================ */
 function save() {
   try {
     state.lastTick = Date.now();
@@ -359,7 +384,7 @@ function load() {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.money === 'number' && parsed.batches) {
       state = parsed;
-      // offline ilerleme
+      if (!state.cart) state.cart = {};
       const elapsed = Math.max(0, (Date.now() - (state.lastTick || Date.now())) / 1000);
       if (elapsed > 1) advanceOffline(elapsed);
     }
@@ -390,22 +415,18 @@ function advanceOffline(seconds) {
    HESAPLAR
 ============================================================ */
 function container() { return CONTAINER_LEVELS[state.containerLevel]; }
-
 function storageCap() { return container().storage; }
 function storageUsed() { return state.inventory.mushroom; }
-
 function activeSubstrate() {
   return state.batches
     .filter(b => !['spent','contaminated'].includes(b.phase))
     .reduce((s) => s + BATCH_WEIGHT, 0);
 }
-
 function fmt(n) {
   if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
   if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
   return Math.floor(n).toString();
 }
-function fmtKg(n) { return (+n).toFixed(1) + ' kg'; }
 function fmtMoney(n) { return '₺' + fmt(n); }
 
 function hasMaterials() {
@@ -413,10 +434,9 @@ function hasMaterials() {
   return inv.straw >= RECIPE.straw && inv.bran >= RECIPE.bran &&
          inv.gypsum >= RECIPE.gypsum && inv.lime >= RECIPE.lime && inv.bag >= RECIPE.bag;
 }
-
 function contamRiskFor(method) {
   const base = METHODS[method].risk;
-  const climateFactor = 1.3 - container().climate; // 0.35 iklim → 0.95, 0.95 iklim → 0.35
+  const climateFactor = 1.3 - container().climate;
   return +(base * climateFactor).toFixed(3);
 }
 
@@ -432,7 +452,6 @@ function createBatch(method) {
   const m = METHODS[method];
   if (state.money < m.cost) { alert('Ek maliyet için para yetersiz.'); return; }
 
-  // malzeme düş
   state.inventory.straw  -= RECIPE.straw;
   state.inventory.bran   -= RECIPE.bran;
   state.inventory.gypsum -= RECIPE.gypsum;
@@ -503,20 +522,15 @@ function inoculate(id) {
 function harvest(id) {
   const b = state.batches.find(x => x.id === id);
   if (!b || b.phase !== 'ready') return;
-
   const base = [2.2, 1.2, 0.6][b.flush - 1] || 0;
   const climateMult = 0.6 + container().climate * 0.6;
   const yieldKg = +(base * climateMult).toFixed(2);
-
   if (storageUsed() + yieldKg > storageCap()) {
-    alert('Depo dolu! Önce mantar sat veya konteyneri yükselt.');
-    return;
+    alert('Depo dolu! Önce mantar sat veya konteyneri yükselt.'); return;
   }
-
   state.inventory.mushroom += yieldKg;
   b.flush += 1;
   b.logs.push(`Hasat: ${yieldKg} kg mantar (Flaş ${b.flush - 1}).`);
-
   if (b.flush > 3) {
     b.phase = 'spent'; b.duration = 0; b.progress = 0;
     b.logs.push('3 flaş tamamlandı. Parti tükendi, kaldır.');
@@ -539,17 +553,33 @@ function removeBatch(id) {
 }
 
 /* ============================================================
-   PAZAR
+   SEPET
 ============================================================ */
-function buyMaterial(mat, qty) {
-  const m = MATERIALS[mat];
-  const total = m.price * qty;
-  if (state.money < total) { alert('Para yetersiz.'); return; }
+function addToCart(mat, qty) {
+  if (!state.cart) state.cart = {};
+  state.cart[mat] = (state.cart[mat] || 0) + qty;
+  save();
+  renderPazar();
+}
+function cartTotal() {
+  let t = 0;
+  for (const k in state.cart) t += MATERIALS[k].price * state.cart[k];
+  return t;
+}
+function buyCart() {
+  const keys = Object.keys(state.cart).filter(k => state.cart[k] > 0);
+  if (!keys.length) return;
+  const total = cartTotal();
+  if (state.money < total) { alert('Para yetersiz. Toplam: ' + fmtMoney(total)); return; }
   state.money -= total;
-  state.inventory[mat] += qty;
-  render(); save();
+  keys.forEach(k => state.inventory[k] += state.cart[k]);
+  state.cart = {};
+  save(); render();
 }
 
+/* ============================================================
+   SATIŞ
+============================================================ */
 function sellMushrooms(qty) {
   const amount = qty === 'all' ? state.inventory.mushroom : Math.min(qty, state.inventory.mushroom);
   if (amount <= 0) return;
@@ -613,7 +643,7 @@ function renderUretim() {
     </div>`;
   }
 
-  html += `<div class="hint">Aktif substrat: <b>${activeSubstrate()} / ${c.capacity} kg</b> · İklim kontrolü: <b>%${Math.round(c.climate*100)}</b> · Depo: <b>${storageUsed().toFixed(1)} / ${c.storage} kg</b></div>`;
+  html += `<div class="hint">Aktif substrat: <b>${activeSubstrate()} / ${c.capacity} kg</b> · İklim: <b>%${Math.round(c.climate*100)}</b> · Depo: <b>${storageUsed().toFixed(1)} / ${c.storage} kg</b></div>`;
 
   state.batches.forEach(b => {
     const ph = PHASES[b.phase];
@@ -632,7 +662,7 @@ function renderUretim() {
         <div class="bar"><div class="fill ${isBad?'bad':''}" style="width:${b.progress||0}%"></div></div>
         <div class="batch-info">
           <span>${METHODS[b.method].name} · Risk %${Math.round(b.contamRisk*100)}</span>
-          <span class="time-left">${timeLeft}</span>
+          <span>${timeLeft}</span>
         </div>
         <div class="batch-log">${b.logs[b.logs.length-1] || ''}</div>
         <div class="batch-actions">
@@ -649,20 +679,27 @@ function renderUretim() {
 
 function renderPazar() {
   let html = `<div class="section-head"><h2>Pazar</h2></div>`;
+  html += `<div class="hint">Malzemeleri sepete ekle, sonra topluca satın al.</div>`;
   html += `<div class="mat-list">`;
 
   Object.entries(MATERIALS).forEach(([key, m]) => {
+    const inCart = state.cart[key] || 0;
+    const owned = (+state.inventory[key]).toFixed(key === 'bag' ? 0 : 1);
     html += `
       <div class="mat">
-        <div class="ico">${m.icon}</div>
-        <div class="info">
-          <div class="name">${m.name}</div>
-          <div class="sub">₺${m.price}/${m.unit}</div>
+        <div class="mat-main">
+          <div class="ico">${m.icon}</div>
+          <div class="info">
+            <div class="name">${m.name}</div>
+            <div class="sub">₺${m.price}/${m.unit}${inCart ? ' · Sepette ' + inCart : ''}</div>
+          </div>
+          <div class="own">${owned} ${m.unit}</div>
         </div>
-        <div class="own">${(+state.inventory[key]).toFixed(key==='bag'?0:1)} ${m.unit}</div>
-        <div class="buy-btns">
-          <button class="btn btn-ghost" data-action="buy" data-mat="${key}" data-qty="1">+1</button>
-          <button class="btn btn-ghost" data-action="buy" data-mat="${key}" data-qty="10">+10</button>
+        <div class="mat-controls">
+          <button class="btn btn-ghost" data-action="cartAdd" data-mat="${key}" data-qty="1">+1</button>
+          <button class="btn btn-ghost" data-action="cartAdd" data-mat="${key}" data-qty="10">+10</button>
+          <input type="number" class="qty-input" data-mat="${key}" placeholder="Miktar..." min="1" inputmode="numeric" />
+          <button class="btn btn-ghost" data-action="cartAddCustom" data-mat="${key}">Ekle</button>
         </div>
       </div>
     `;
@@ -670,6 +707,41 @@ function renderPazar() {
 
   html += `</div>`;
 
+  // Sepet
+  const keys = Object.keys(state.cart).filter(k => state.cart[k] > 0);
+  if (keys.length > 0) {
+    let total = 0;
+    let rows = '';
+    keys.forEach(k => {
+      const m = MATERIALS[k];
+      const q = state.cart[k];
+      const sub = m.price * q;
+      total += sub;
+      rows += `
+        <div class="cart-row">
+          <span>${m.icon} ${m.name} × ${q}</span>
+          <span>₺${sub}</span>
+          <button class="cart-rm" data-action="cartRemove" data-mat="${k}" aria-label="Kaldır">×</button>
+        </div>
+      `;
+    });
+    html += `
+      <div class="cart-box">
+        <h3>Sepet</h3>
+        ${rows}
+        <div class="cart-total">
+          <span>Toplam</span>
+          <span class="big">₺${total}</span>
+        </div>
+        <div class="cart-btns">
+          <button class="btn btn-ghost" data-action="cartClear">Temizle</button>
+          <button class="btn btn-green" data-action="cartBuy">Satın Al</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // Satış
   const price = state.marketPrice * (1 + container().priceBonus);
   html += `
     <div class="sell-box">
@@ -719,7 +791,7 @@ function renderKonteyner() {
       </div>
     `;
   } else {
-    html += `<div class="hint">Maksimum seviyeye ulaştın. Konteyner tam kapasite.</div>`;
+    html += `<div class="hint">Maksimum seviyeye ulaştın.</div>`;
   }
 
   tabContent.innerHTML = html;
@@ -765,13 +837,38 @@ tabContent.addEventListener('click', (e) => {
   const action = btn.dataset.action;
 
   if (action === 'newBatch') openNewBatch();
-  else if (action === 'buy') buyMaterial(btn.dataset.mat, parseInt(btn.dataset.qty));
   else if (action === 'sell') sellMushrooms(btn.dataset.qty === 'all' ? 'all' : parseInt(btn.dataset.qty));
   else if (action === 'upgrade') upgradeContainer();
   else if (action === 'inoculate') inoculate(parseFloat(btn.dataset.id));
   else if (action === 'harvest') harvest(parseFloat(btn.dataset.id));
   else if (action === 'remove') removeBatch(parseFloat(btn.dataset.id));
-  else if (action === 'createBatch') createBatch(btn.dataset.method);
+  else if (action === 'cartAdd') addToCart(btn.dataset.mat, parseInt(btn.dataset.qty));
+  else if (action === 'cartAddCustom') {
+    const mat = btn.dataset.mat;
+    const input = tabContent.querySelector('.qty-input[data-mat="' + mat + '"]');
+    const qty = parseInt(input.value);
+    if (!qty || qty < 1) { alert('Geçerli bir miktar gir.'); return; }
+    addToCart(mat, qty);
+  }
+  else if (action === 'cartRemove') {
+    delete state.cart[btn.dataset.mat];
+    save(); renderPazar();
+  }
+  else if (action === 'cartClear') {
+    state.cart = {};
+    save(); renderPazar();
+  }
+  else if (action === 'cartBuy') buyCart();
+});
+
+tabContent.addEventListener('keydown', (e) => {
+  if (e.target.classList.contains('qty-input') && e.key === 'Enter') {
+    e.preventDefault();
+    const mat = e.target.dataset.mat;
+    const qty = parseInt(e.target.value);
+    if (!qty || qty < 1) return;
+    addToCart(mat, qty);
+  }
 });
 
 /* ============================================================
@@ -826,12 +923,18 @@ function openNewBatch() {
 
   modalEl.innerHTML = html;
   modalBack.classList.add('on');
-  const closeBtn = modalEl.querySelector('#modalClose');
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
 }
 
 function closeModal() { modalBack.classList.remove('on'); }
 modalBack.addEventListener('click', (e) => { if (e.target === modalBack) closeModal(); });
+
+// modal içindeki createBatch tıklamaları
+modalEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action="createBatch"]');
+  if (!btn) return;
+  createBatch(btn.dataset.method);
+});
 
 /* ============================================================
    TICK
@@ -839,16 +942,12 @@ modalBack.addEventListener('click', (e) => { if (e.target === modalBack) closeMo
 function tick() {
   state.tickCount++;
 
-  // pazar fiyatı dalgalanması
   if (state.tickCount % 20 === 0) {
     const base = 165;
     state.marketPrice = Math.round(base * (0.8 + Math.random() * 0.4));
   }
-
-  // gün
   if (state.tickCount % 12 === 0) state.day++;
 
-  // partiler
   state.batches.forEach(b => {
     if (['cooled','ready','spent','contaminated'].includes(b.phase)) return;
     if (!b.duration) return;
@@ -875,7 +974,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   state = {
     money: START_MONEY, day: 1, tickCount: 0,
     inventory: { straw:0, bran:0, gypsum:0, lime:0, spawn:0, bag:0, mushroom:0 },
-    batches: [], containerLevel: 1, marketPrice: 165, lastTick: Date.now()
+    batches: [], containerLevel: 1, marketPrice: 165, cart: {}, lastTick: Date.now()
   };
   save(); render();
 });
@@ -883,7 +982,6 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 /* ============================================================
    CHAT
 ============================================================ */
-// >>> BURAYA KENDİ FIREBASE CONFIG'İNİ YAP <<<
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "YOUR_PROJECT.firebaseapp.com",
