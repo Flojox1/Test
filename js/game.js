@@ -12,20 +12,22 @@ import {
 
 import {
   MATERIALS, RECIPE, METHODS, PHASES, CONTAINER_LEVELS,
-  MAX_CONTAINERS, NEW_CONTAINER_COST,
+  MAX_CONTAINERS, NEW_CONTAINER_COST, BATCH_WEIGHT,
   MASTER_TYPES, STAR_SPEED, RESTART_MODES
 } from './data.js';
 
 import { initChat } from './chat.js';
 
 let activeTab = 'uretim';
-let selectedContainerId = 1;
 let logicInterval = null;
+
+// Üretim tab görünümü: 'list' veya 'container'
+let uretimView = 'list';
+let viewingContainerId = null;
 
 const tabContent = document.getElementById('tabContent');
 const modalBack = document.getElementById('modalBack');
 const modalEl = document.getElementById('modal');
-const fabBtn = document.getElementById('fabBtn');
 
 /* ---------- ADVANCE STATE ---------- */
 export function advanceState() {
@@ -98,11 +100,36 @@ export function nextPhase(b) {
   }
 }
 
+function getPhaseIcon(b) {
+  switch (b.phase) {
+    case 'pasteurizing': return '♨️';
+    case 'cooling':      return '❄️';
+    case 'cooled':       return '🧊';
+    case 'incubating':   return '🧫';
+    case 'pinning':      return '🌱';
+    case 'fruiting':     return '🍄';
+    case 'ready':        return '🍄';
+    case 'resting':      return '💤';
+    case 'spent':        return '💀';
+    case 'contaminated': return '❌';
+    default: return '?';
+  }
+}
+
 /* ---------- PARTİ ---------- */
-export function createBatch(method) {
+export function createBatch(method, containerId) {
   if (!hasMaterials()) { alert('Malzeme eksik. Pazar sekmesinden al.'); return; }
-  const cont = findContainerWithSpace();
-  if (!cont) { alert('Tüm konteynerler dolu.'); return; }
+  let cont;
+  if (containerId != null) {
+    cont = state.containers.find(c => c.id === containerId);
+    if (!cont) return;
+    if (activeSubstrateIn(cont.id) + BATCH_WEIGHT > CONTAINER_LEVELS[cont.level].capacity) {
+      alert('Bu konteynerde boş slot yok.'); return;
+    }
+  } else {
+    cont = findContainerWithSpace();
+    if (!cont) { alert('Tüm konteynerler dolu.'); return; }
+  }
   const m = METHODS[method];
   if (state.money < m.cost) { alert('Ek maliyet için para yetersiz.'); return; }
 
@@ -267,7 +294,6 @@ export function processMasters() {
 
   state.batches.forEach(b => {
     if (b.phase === 'cooled' && inoc) {
-      // Usta misel yoksa otomatik satın alır (para yeterliyse)
       if (state.inventory.spawn < 0.3) {
         const need = 0.3 - state.inventory.spawn;
         const cost = getMaterialPrice('spawn') * need;
@@ -284,7 +310,6 @@ export function processMasters() {
     if (b.phase === 'ready' && harv) harvest(b.id, true);
   });
 
-  // Ustalar kontamine kompostları temizler (6 tick = yarım gün gecikmeyle)
   if (state.masters.length > 0) {
     for (let i = state.batches.length - 1; i >= 0; i--) {
       const b = state.batches[i];
@@ -327,18 +352,18 @@ export function sellMushrooms(qty) {
 }
 
 /* ---------- KONTEYNER ---------- */
-export function upgradeContainer(containerId) {
+export function doUpgrade(containerId) {
   const cont = state.containers.find(c => c.id === containerId);
   if (!cont) return;
   const next = cont.level + 1;
   if (next >= CONTAINER_LEVELS.length) return;
   const lvl = CONTAINER_LEVELS[next];
   if (state.money < lvl.cost) { alert('Para yetersiz.'); return; }
-  if (!confirm(`${lvl.name} için ${fmtMoney(lvl.cost)} ödenecek. Onaylıyor musun?`)) return;
   state.money -= lvl.cost;
   cont.level = next;
   render(); save();
 }
+
 export function buyNewContainer() {
   if (state.containers.length >= MAX_CONTAINERS) { alert('Maksimum konteyner sayısı.'); return; }
   if (state.money < NEW_CONTAINER_COST) { alert('Para yetersiz.'); return; }
@@ -346,7 +371,6 @@ export function buyNewContainer() {
   state.money -= NEW_CONTAINER_COST;
   const newId = Math.max(...state.containers.map(c => c.id), 0) + 1;
   state.containers.push({ id: newId, level: 1 });
-  selectedContainerId = newId;
   render(); save();
 }
 
@@ -362,7 +386,6 @@ export function renderHUD() {
   document.querySelectorAll('.speed-btn').forEach(btn => {
     btn.classList.toggle('active', parseInt(btn.dataset.speed) === state.speed);
   });
-  if (fabBtn) fabBtn.classList.toggle('hidden', activeTab !== 'uretim');
 }
 
 export function render() {
@@ -375,130 +398,150 @@ export function render() {
 
 export function renderLive() {
   renderHUD();
+  const scrollTop = tabContent.scrollTop;
   if (activeTab === 'uretim') renderUretim();
   else if (activeTab === 'depo') renderDepo();
   else if (activeTab === 'pazar' && state._marketChanged) {
-    renderPazar();
-    state._marketChanged = false;
+    renderPazar(); state._marketChanged = false;
   } else if (activeTab === 'ustalar' && state._masterPoolChanged) {
-    renderUstalar();
-    state._masterPoolChanged = false;
+    renderUstalar(); state._masterPoolChanged = false;
+  }
+  tabContent.scrollTop = scrollTop;
+}
+
+/* ---------- ÜRETİM ---------- */
+export function renderUretim() {
+  if (uretimView === 'container' && viewingContainerId != null) {
+    const cont = state.containers.find(c => c.id === viewingContainerId);
+    if (!cont) { uretimView = 'list'; viewingContainerId = null; return renderUretim(); }
+    renderContainerView(cont);
+  } else {
+    renderContainerList();
   }
 }
 
-export function renderUretim() {
+function renderContainerList() {
   let html = `
     <div class="section-head">
-      <h2>Üretim</h2>
+      <h2>Üretim · Konteynerler</h2>
       <button class="btn btn-ghost" data-action="skipDay">⏩ 1 Gün</button>
     </div>
   `;
 
-  // Container strip
-  html += `<div class="container-strip">`;
+  const totCap = state.containers.reduce((s, c) => s + CONTAINER_LEVELS[c.level].capacity, 0);
+  html += `<div class="hint">Toplam substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b></div>`;
+
+  html += `<div class="container-list">`;
   state.containers.forEach(c => {
     const lvl = CONTAINER_LEVELS[c.level];
     const active = activeSubstrateIn(c.id);
     const pct = Math.min(100, (active / lvl.capacity) * 100);
+    const slotCount = Math.floor(lvl.capacity / BATCH_WEIGHT);
+    const usedSlots = Math.floor(active / BATCH_WEIGHT);
     html += `
-      <div class="container-chip ${c.id === selectedContainerId ? 'active' : ''}" data-container="${c.id}">
-        <div class="chip-num">K${c.id}</div>
-        <div class="chip-level">Sv.${c.level}</div>
-        <div class="chip-bar"><div class="chip-fill" style="width:${pct}%"></div></div>
-        <div class="chip-status">${active}/${lvl.capacity}</div>
+      <div class="container-list-item" data-action="openContainer" data-id="${c.id}">
+        <div class="head">
+          <h3>Konteyner #${c.id}</h3>
+          <span class="sv">Sv.${c.level}</span>
+        </div>
+        <div class="name">${lvl.name}</div>
+        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+        <div class="bar-info">
+          <span>${active}/${lvl.capacity} kg</span>
+          <span>${usedSlots}/${slotCount} slot</span>
+        </div>
       </div>
     `;
   });
   if (state.containers.length < MAX_CONTAINERS) {
     html += `
-      <div class="container-chip container-add" data-action="buyContainer">
-        <div class="chip-num">+</div>
-        <div class="chip-level">Yeni</div>
+      <div class="container-list-item add" data-action="buyContainer">
+        <h3>+ Yeni Konteyner</h3>
+        <div class="price">${fmtMoney(NEW_CONTAINER_COST)}</div>
       </div>
     `;
   }
   html += `</div>`;
 
-  // Selected container detail
-  const selCont = state.containers.find(c => c.id === selectedContainerId) || state.containers[0];
-  if (selCont) {
-    selectedContainerId = selCont.id;
-    const lvl = CONTAINER_LEVELS[selCont.level];
-    const next = CONTAINER_LEVELS[selCont.level + 1];
-    const active = activeSubstrateIn(selCont.id);
-    html += `
-      <div class="container-detail">
-        <h3>Konteyner #${selCont.id} · ${lvl.name}</h3>
-        <div class="stat-grid">
-          <div class="stat-cell"><div class="k">Substrat</div><div class="v">${active}/${lvl.capacity} kg</div></div>
-          <div class="stat-cell"><div class="k">Depo</div><div class="v">${lvl.storage} kg</div></div>
-          <div class="stat-cell"><div class="k">İklim</div><div class="v">%${Math.round(lvl.climate*100)}</div></div>
-          <div class="stat-cell"><div class="k">Fiyat</div><div class="v">+%${Math.round(lvl.priceBonus*100)}</div></div>
+  tabContent.innerHTML = html;
+}
+
+function renderContainerView(cont) {
+  const lvl = CONTAINER_LEVELS[cont.level];
+  const next = CONTAINER_LEVELS[cont.level + 1];
+  const active = activeSubstrateIn(cont.id);
+  const slotCount = Math.floor(lvl.capacity / BATCH_WEIGHT);
+  const batchesHere = state.batches.filter(b => b.containerId === cont.id);
+  const activeBatches = batchesHere.filter(b => !['spent','contaminated'].includes(b.phase));
+  const deadBatches = batchesHere.filter(b => ['spent','contaminated'].includes(b.phase));
+
+  let html = `
+    <div class="container-view-head">
+      <div class="left">
+        <button class="x-btn" data-action="exitContainer" aria-label="Geri">×</button>
+        <div class="title-block">
+          <h3>Konteyner #${cont.id}</h3>
+          <div class="name">${lvl.name} · Sv.${cont.level}</div>
         </div>
-        ${next ? `
-          <div class="upgrade-box">
-            <h4>Yükselt: ${next.name}</h4>
-            <p>Kapasite ${next.capacity} kg · Depo ${next.storage} kg · İklim %${Math.round(next.climate*100)}${next.priceBonus?' · Fiyat +%'+Math.round(next.priceBonus*100):''}</p>
-            <div class="cost">${fmtMoney(next.cost)}</div>
-            <button class="btn btn-green" data-action="upgradeContainer" data-id="${selCont.id}">Yükselt</button>
-          </div>
-        ` : `<div class="hint">Maksimum seviye.</div>`}
       </div>
-    `;
-  }
+      ${next ? `<button class="btn btn-green" data-action="openUpgrade" data-id="${cont.id}">Yükselt</button>` : ''}
+    </div>
+  `;
 
-  // Summary
-  const totCap = state.containers.reduce((s, c) => s + CONTAINER_LEVELS[c.level].capacity, 0);
-  html += `<div class="hint">Aktif substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b></div>`;
+  html += `<div class="hint">
+    Substrat: <b>${active}/${lvl.capacity} kg</b> ·
+    Slot: <b>${activeBatches.length}/${slotCount}</b> ·
+    İklim: <b>%${Math.round(lvl.climate*100)}</b>
+  </div>`;
 
-  // Batches
-  if (state.batches.length === 0) {
-    html += `<div class="hint">Henüz parti yok. Sağ alttaki <b>+</b> butonuna basarak başla.</div>`;
-  } else {
-    state.batches.forEach(b => {
+  // Slots
+  html += `<div class="slot-grid">`;
+  for (let i = 0; i < slotCount; i++) {
+    if (i < activeBatches.length) {
+      const b = activeBatches[i];
       const ph = PHASES[b.phase] || { label: '?' };
-      const isBad = b.phase === 'contaminated';
+      const icon = getPhaseIcon(b);
       const isReady = b.phase === 'ready';
-      const isSpent = b.phase === 'spent';
-      const timeLeft = b.duration && !['cooled','ready','spent','contaminated'].includes(b.phase)
-        ? Math.ceil((100 - b.progress) / 100 * b.duration) + 'sn'
-        : '';
-      const risk = currentContamRisk(b);
-
-      let actions = '';
-      if (b.phase === 'cooled') actions += `<button class="btn btn-green" data-action="inoculate" data-id="${b.id}">Misel Ek (0.3 kg)</button>`;
-      if (b.phase === 'ready')  actions += `<button class="btn btn-green" data-action="harvest" data-id="${b.id}">Hasat Et</button>`;
-      if (isSpent) actions += `<button class="btn btn-green" data-action="manualRestart" data-id="${b.id}">Yeniden Başlat</button>`;
-      if (['spent','contaminated'].includes(b.phase)) actions += `<button class="btn btn-danger" data-action="remove" data-id="${b.id}">Kaldır</button>`;
-
+      const isBad = b.phase === 'contaminated';
       html += `
-        <div class="batch ${isBad?'contaminated':''} ${isReady?'ready':''}" data-id="${b.id}">
-          <div class="batch-head">
-            <span class="title">Parti · Flaş ${b.flush}/3 · K${b.containerId}</span>
-            <span class="phase ${isBad?'bad':''}">${ph.label}</span>
-          </div>
-          <div class="bar"><div class="fill ${isBad?'bad':''}" style="width:${b.progress||0}%"></div></div>
-          <div class="batch-info">
-            <span>${METHODS[b.method].name} · Risk %${Math.round(risk*100)}</span>
-            <span>${timeLeft}</span>
-          </div>
-          <div class="batch-log">${b.logs[b.logs.length-1] || ''}</div>
-          <div class="batch-actions">${actions}</div>
+        <div class="slot filled ${isReady?'ready':''} ${isBad?'bad':''}" data-action="openBatch" data-id="${b.id}">
+          <div class="slot-icon">${icon}</div>
+          <div class="slot-phase">${ph.label}</div>
+          <div class="slot-bar"><div class="slot-fill" style="width:${b.progress||0}%"></div></div>
+        </div>
+      `;
+    } else {
+      html += `<div class="slot empty" data-action="newBatchIn" data-container="${cont.id}" aria-label="Yeni Parti">+</div>`;
+    }
+  }
+  html += `</div>`;
+
+  // Dead batches
+  if (deadBatches.length > 0) {
+    html += `<div class="dead-batches"><div class="dead-title">Temizlenmesi Gerekenler</div>`;
+    deadBatches.forEach(b => {
+      const isBad = b.phase === 'contaminated';
+      html += `
+        <div class="dead-batch">
+          <span>${isBad?'❌ Kontamine':'✅ Tükendi'} · Flaş ${b.flush-1}/3</span>
+          <button class="btn btn-danger" data-action="remove" data-id="${b.id}">Kaldır</button>
         </div>
       `;
     });
+    html += `</div>`;
   }
 
   tabContent.innerHTML = html;
 }
 
+/* ---------- PAZAR ---------- */
 export function renderPazar() {
   let html = `<div class="section-head"><h2>Pazar</h2></div>`;
   const next = 60 - (state.day % 60);
   html += `<div class="hint">
-    Piyasa döngüsü: <b>Flaş başına ~₺${state.market.profitPerFlush}</b> kâr ·
-    Malzeme katsayısı <b>${state.market.materialMult.toFixed(2)}×</b> ·
-    Sonraki değişim: <b>${next} gün</b>
+    Piyasa: <b>Flaş başına ~₺${state.market.profitPerFlush}</b> kâr ·
+    Malzeme <b>${state.market.materialMult.toFixed(2)}×</b> ·
+    Sonraki: <b>${next} gün</b>
   </div>`;
 
   html += `<div class="mat-list">`;
@@ -578,6 +621,7 @@ export function renderPazar() {
   tabContent.innerHTML = html;
 }
 
+/* ---------- USTALAR ---------- */
 export function renderUstalar() {
   let html = `<div class="section-head"><h2>Ustalar</h2></div>`;
 
@@ -687,6 +731,7 @@ export function renderUstalar() {
   }
 }
 
+/* ---------- DEPO ---------- */
 export function renderDepo() {
   const cap = totalStorageCap();
   const used = storageUsed();
@@ -709,7 +754,13 @@ export function renderDepo() {
 }
 
 /* ---------- MODAL ---------- */
-export function openNewBatch() {
+export function openNewBatchModal(containerId) {
+  const cont = state.containers.find(c => c.id === containerId);
+  if (!cont) return;
+  if (activeSubstrateIn(cont.id) + BATCH_WEIGHT > CONTAINER_LEVELS[cont.level].capacity) {
+    alert('Bu konteynerde boş slot yok.');
+    return;
+  }
   const missing = [];
   if (state.inventory.straw < RECIPE.straw) missing.push(`${RECIPE.straw} kg saman`);
   if (state.inventory.bran < RECIPE.bran) missing.push(`${RECIPE.bran} kg kepek`);
@@ -717,27 +768,21 @@ export function openNewBatch() {
   if (state.inventory.lime < RECIPE.lime) missing.push(`${RECIPE.lime} kg kireç`);
   if (state.inventory.bag < RECIPE.bag) missing.push(`${RECIPE.bag} poşet`);
 
-  const targetCont = findContainerWithSpace();
-
   let html = `
     <h2>Yeni Parti</h2>
-    <span class="sub">10 kg substrat · İstiridye mantarı</span>
+    <span class="sub">Konteyner #${cont.id}</span>
     <div class="recipe">
       <b>Reçete:</b> 7 kg saman · 2 kg kepek · 0.5 kg alçı · 0.5 kg kireç · 4 poşet<br>
-      <b>Misel:</b> 0.3 kg (soğutma sonrası)<br>
-      <b>Konteyner:</b> ${targetCont ? 'Konteyner #' + targetCont.id : '❌ Tüm konteynerler dolu'}
+      <b>Misel:</b> 0.3 kg (soğutma sonrası)
     </div>
   `;
-
   if (missing.length) html += `<div class="hint danger">Eksik: <b>${missing.join(', ')}</b></div>`;
-  if (!targetCont) html += `<div class="hint danger">Tüm konteynerler dolu.</div>`;
 
   html += `<div style="font-size:0.68rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Pastörizasyon</div>`;
-
   Object.entries(METHODS).forEach(([key, m]) => {
-    const disabled = missing.length || !targetCont || state.money < m.cost;
+    const disabled = missing.length || state.money < m.cost;
     html += `
-      <div class="method ${disabled?'disabled':''}" ${disabled?'':'data-action="createBatch" data-method="'+key+'"'}>
+      <div class="method ${disabled?'disabled':''}" ${disabled?'':'data-action="createBatchIn" data-method="'+key+'" data-container="'+cont.id+'"'}>
         <div class="m-ico">${m.icon}</div>
         <div class="m-info">
           <div class="m-name">${m.name}</div>
@@ -749,6 +794,91 @@ export function openNewBatch() {
 
   html += `<button class="close" id="modalClose">Kapat</button>`;
   modalEl.innerHTML = html;
+  modalBack.classList.add('on');
+  modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
+}
+
+export function openBatchModal(id) {
+  const b = state.batches.find(x => x.id === id);
+  if (!b) return;
+  const ph = PHASES[b.phase] || { label: '?' };
+  const risk = currentContamRisk(b);
+  const timeLeft = b.duration && !['cooled','ready','spent','contaminated'].includes(b.phase)
+    ? Math.ceil((100 - b.progress) / 100 * b.duration) + 'sn'
+    : '—';
+
+  let actionHtml = '';
+  if (b.phase === 'cooled') actionHtml = `<button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="inoculateModal" data-id="${b.id}">Misel Ek (0.3 kg)</button>`;
+  else if (b.phase === 'ready') actionHtml = `<button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="harvestModal" data-id="${b.id}">Hasat Et</button>`;
+  else if (b.phase === 'spent') actionHtml = `<button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="manualRestartModal" data-id="${b.id}">Yeniden Başlat</button>`;
+  else if (b.phase === 'contaminated') actionHtml = `<button class="btn btn-danger" style="width:100%;margin-bottom:8px" data-action="removeModal" data-id="${b.id}">Kaldır</button>`;
+
+  modalEl.innerHTML = `
+    <h2>Parti Detayı</h2>
+    <span class="sub">Konteyner #${b.containerId} · Flaş ${b.flush}/3</span>
+    <div class="batch-detail">
+      <div class="bd-row"><span class="k">Aşama</span><span class="v">${ph.label}</span></div>
+      <div class="bd-row"><span class="k">Yöntem</span><span class="v">${METHODS[b.method].name}</span></div>
+      <div class="bd-row"><span class="k">İlerleme</span><span class="v">${Math.round(b.progress||0)}%</span></div>
+      <div class="bd-row"><span class="k">Kalan süre</span><span class="v">${timeLeft}</span></div>
+      <div class="bd-row"><span class="k">Kontaminasyon riski</span><span class="v ${risk>0.1?'danger':'green'}">%${Math.round(risk*100)}</span></div>
+    </div>
+    ${actionHtml}
+    <button class="close" id="modalClose">Kapat</button>
+  `;
+  modalBack.classList.add('on');
+  modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
+}
+
+export function openUpgradeModal(containerId) {
+  const cont = state.containers.find(c => c.id === containerId);
+  if (!cont) return;
+  const curr = CONTAINER_LEVELS[cont.level];
+  const next = CONTAINER_LEVELS[cont.level + 1];
+
+  if (!next) {
+    modalEl.innerHTML = `
+      <h2>Yükselt</h2>
+      <span class="sub">Konteyner #${cont.id}</span>
+      <div class="hint">Bu konteyner maksimum seviyede.</div>
+      <button class="close" id="modalClose">Kapat</button>
+    `;
+    modalBack.classList.add('on');
+    modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
+    return;
+  }
+
+  const canAfford = state.money >= next.cost;
+  const fmtShort = n => '₺' + fmt(n);
+
+  modalEl.innerHTML = `
+    <h2>Yükselt</h2>
+    <span class="sub">Konteyner #${cont.id}</span>
+    <div class="upgrade-compare">
+      <div class="col">
+        <h4>Mevcut · Sv.${cont.level}</h4>
+        <div class="row"><span class="k">Kapasite</span><span class="v">${curr.capacity} kg</span></div>
+        <div class="row"><span class="k">Depo</span><span class="v">${curr.storage} kg</span></div>
+        <div class="row"><span class="k">İklim</span><span class="v">%${Math.round(curr.climate*100)}</span></div>
+        <div class="row"><span class="k">Fiyat</span><span class="v">+%${Math.round(curr.priceBonus*100)}</span></div>
+      </div>
+      <div class="col">
+        <h4>Sonraki · Sv.${cont.level+1}</h4>
+        <div class="row"><span class="k">Kapasite</span><span class="v up">${next.capacity} kg</span></div>
+        <div class="row"><span class="k">Depo</span><span class="v up">${next.storage} kg</span></div>
+        <div class="row"><span class="k">İklim</span><span class="v up">%${Math.round(next.climate*100)}</span></div>
+        <div class="row"><span class="k">Fiyat</span><span class="v up">+%${Math.round(next.priceBonus*100)}</span></div>
+      </div>
+    </div>
+    <div class="upgrade-cost">
+      <div class="lbl">Maliyet</div>
+      <div class="val ${canAfford?'':'poor'}">${fmtShort(next.cost)}</div>
+    </div>
+    <button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="doUpgrade" data-id="${cont.id}" ${canAfford?'':'disabled'}>
+      ${canAfford ? 'Yükselt' : 'Para Yetersiz'}
+    </button>
+    <button class="close" id="modalClose">İptal</button>
+  `;
   modalBack.classList.add('on');
   modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
 }
@@ -766,26 +896,27 @@ export function setupEvents() {
   });
 
   tabContent.addEventListener('click', (e) => {
-    // Konteyner çipi seçimi
-    const chip = e.target.closest('.container-chip[data-container]');
-    if (chip) {
-      selectedContainerId = parseInt(chip.dataset.container);
-      renderUretim();
-      return;
-    }
-
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const a = btn.dataset.action;
-    if (a === 'newBatch') openNewBatch();
+
+    if (a === 'openContainer') {
+      uretimView = 'container';
+      viewingContainerId = parseInt(btn.dataset.id);
+      renderUretim();
+    }
+    else if (a === 'exitContainer') {
+      uretimView = 'list';
+      viewingContainerId = null;
+      renderUretim();
+    }
+    else if (a === 'openUpgrade') openUpgradeModal(parseInt(btn.dataset.id));
+    else if (a === 'openBatch') openBatchModal(parseFloat(btn.dataset.id));
+    else if (a === 'newBatchIn') openNewBatchModal(parseInt(btn.dataset.container));
+    else if (a === 'buyContainer') buyNewContainer();
     else if (a === 'skipDay') { for (let i = 0; i < 12; i++) advanceState(); render(); save(); }
     else if (a === 'sell') sellMushrooms(btn.dataset.qty === 'all' ? 'all' : parseInt(btn.dataset.qty));
-    else if (a === 'upgradeContainer') upgradeContainer(parseInt(btn.dataset.id));
-    else if (a === 'buyContainer') buyNewContainer();
-    else if (a === 'inoculate') { if (inoculate(parseFloat(btn.dataset.id), false)) { render(); save(); } }
-    else if (a === 'harvest') { if (harvest(parseFloat(btn.dataset.id), false)) { render(); save(); } }
     else if (a === 'remove') removeBatch(parseFloat(btn.dataset.id));
-    else if (a === 'manualRestart') manualRestart(parseFloat(btn.dataset.id));
     else if (a === 'cartAdd') addToCart(btn.dataset.mat, parseInt(btn.dataset.qty));
     else if (a === 'cartAddCustom') {
       const mat = btn.dataset.mat;
@@ -812,10 +943,17 @@ export function setupEvents() {
   });
 
   modalBack.addEventListener('click', (e) => { if (e.target === modalBack) closeModal(); });
+
   modalEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action="createBatch"]');
+    const btn = e.target.closest('[data-action]');
     if (!btn) return;
-    createBatch(btn.dataset.method);
+    const a = btn.dataset.action;
+    if (a === 'createBatchIn') createBatch(btn.dataset.method, parseInt(btn.dataset.container));
+    else if (a === 'doUpgrade') { doUpgrade(parseInt(btn.dataset.id)); closeModal(); }
+    else if (a === 'inoculateModal') { if (inoculate(parseFloat(btn.dataset.id), false)) { closeModal(); render(); save(); } }
+    else if (a === 'harvestModal') { if (harvest(parseFloat(btn.dataset.id), false)) { closeModal(); render(); save(); } }
+    else if (a === 'manualRestartModal') { manualRestart(parseFloat(btn.dataset.id)); closeModal(); }
+    else if (a === 'removeModal') { removeBatch(parseFloat(btn.dataset.id)); closeModal(); }
   });
 
   document.getElementById('speedGroup').addEventListener('click', (e) => {
@@ -827,11 +965,10 @@ export function setupEvents() {
   document.getElementById('resetBtn').addEventListener('click', () => {
     if (!confirm('Tüm ilerleme silinecek. Emin misin?')) return;
     resetState();
-    selectedContainerId = 1;
+    uretimView = 'list';
+    viewingContainerId = null;
     render();
   });
-
-  if (fabBtn) fabBtn.addEventListener('click', () => openNewBatch());
 }
 
 export function setSpeed(s) {
@@ -849,7 +986,6 @@ function startInterval() {
 /* ---------- INIT ---------- */
 export function init() {
   load();
-  if (state.containers.length > 0) selectedContainerId = state.containers[0].id;
   render();
   setupEvents();
   startInterval();
