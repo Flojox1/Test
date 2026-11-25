@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#08080a" />
+<title>SWORDWOUND</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #08080a;
+    --surface: #101014;
+    --text: #e6e2d8;
+    --muted: #7d7a72;
+    --steel: #b8c4cc;
+    --blood: #8b1a1a;
+    --blood-bright: #b02525;
+    --border: #232329;
+    --font-head: 'Cinzel', serif;
+    --font-body: 'Inter', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* arka plan dokusu */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 50% 35%, rgba(139,26,26,0.14) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 50% 100%, rgba(184,196,204,0.05) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(35,35,41,0.35) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(35,35,41,0.35) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: radial-gradient(ellipse 75% 65% at 50% 45%, black 0%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 45%, black 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ---------- SAHNE ---------- */
+  .stage {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+    gap: 0;
+  }
+
+  .tag {
+    font-size: 0.62rem;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--blood-bright);
+    border: 1px solid rgba(176,37,37,0.4);
+    padding: 6px 16px;
+    margin-bottom: 36px;
+    font-weight: 600;
+    animation: rise 0.9s ease both;
+  }
+
+  .title {
+    font-family: var(--font-head);
+    font-weight: 900;
+    font-size: clamp(3rem, 13vw, 7.5rem);
+    line-height: 0.92;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    animation: rise 0.9s 0.08s ease both;
+  }
+
+  .title em {
+    font-style: normal;
+    color: var(--blood-bright);
+  }
+
+  .subtitle {
+    margin-top: 18px;
+    font-size: clamp(0.7rem, 2vw, 0.8rem);
+    font-weight: 300;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--muted);
+    animation: rise 0.9s 0.16s ease both;
+  }
+
+  /* ---------- PLAY BUTONU ---------- */
+  .play-wrap {
+    margin-top: clamp(48px, 8vh, 84px);
+    animation: rise 0.9s 0.28s ease both;
+  }
+
+  .play {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 22px 64px;
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: clamp(1rem, 3.5vw, 1.35rem);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--text);
+    background: var(--blood);
+    border: 1px solid rgba(176,37,37,0.6);
+    cursor: pointer;
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+    transition: background 0.25s, transform 0.15s, box-shadow 0.3s;
+    box-shadow: 0 0 0 rgba(176,37,37,0);
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .play::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.6s ease;
+  }
+
+  .play:hover {
+    background: var(--blood-bright);
+    box-shadow: 0 0 40px rgba(176,37,37,0.35);
+  }
+
+  .play:hover::before { transform: translateX(120%); }
+
+  .play:active { transform: scale(0.97); }
+
+  .play .arrow {
+    font-size: 0.8em;
+    opacity: 0.85;
+    transition: transform 0.25s;
+  }
+
+  .play:hover .arrow { transform: translateX(5px); }
+
+  /* ---------- ALT BİLGİ ---------- */
+  .foot {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 2;
+    padding: 18px 24px calc(18px + env(safe-area-inset-bottom));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .foot span { pointer-events: auto; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(22px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ekran geçişi (play'e basınca) */
+  .fade-out {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: var(--bg);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+
+  .fade-out.on {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  @media (max-width: 480px) {
+    .play { padding: 20px 48px; letter-spacing: 4px; }
+    .subtitle { letter-spacing: 4px; }
+    .foot { font-size: 0.55rem; letter-spacing: 1.5px; }
+  }
+
+  /* yatay ekran / kısa yükseklik */
+  @media (max-height: 520px) {
+    .tag { margin-bottom: 20px; }
+    .play-wrap { margin-top: 32px; }
+    .subtitle { margin-top: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <span class="tag">Erken Erişim</span>
+
+  <h1 class="title">SWORD<em>WOUND</em></h1>
+  <p class="subtitle">Çeliğin Ağırlığı</p>
+
+  <div class="play-wrap">
+    <button class="play" id="playBtn" type="button">
+      Oyna <span class="arrow">›</span>
+    </button>
+  </div>
+</div>
+
+<div class="foot">
+  <span>© 2026 SWORDWOUND</span>
+  <span id="ver">v0.1</span>
+</div>
+
+<div class="fade-out" id="fadeOut"></div>
+
+<script>
+  const playBtn = document.getElementById('playBtn');
+  const fadeOut = document.getElementById('fadeOut');
+
+  playBtn.addEventListener('click', () => {
+    // ekran kararır, sonra oyun sahnesine geçilir
+    fadeOut.classList.add('on');
+
+    setTimeout(() => {
+      // şimdilik placeholder — oyun sahnesi buraya gelecek
+      fadeOut.classList.remove('on');
+      // örnek: window.location.href = 'game.html';
+      alert('Oyun sahnesi buraya gelecek.');
+    }, 700);
+  });
+</script>
+
+</body>
+</html>
