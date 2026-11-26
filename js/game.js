@@ -515,6 +515,39 @@ function renderContainerList() {
   html += `<div class="hint">Toplam substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b> · İşletme alanına dokununca içindeki konteynerler açılır.</div>`;
 
   html += `<div class="plot-list">`;
+
+  // İlk mantar dönemindeki başlangıç konteyneri ücretsiz üretim alanıdır,
+  // oyuncuya satın alınmış şehir arsası olarak sayılmaz.
+  const starterContainers = plotContainers(START_PLOT);
+  if (starterContainers.length && !state.plots.some(p => Number(p.id) === Number(START_PLOT))) {
+    const open = expandedPlots.has(START_PLOT);
+    html += `
+      <div class="plot-group ${open ? 'open' : ''}">
+        <div class="plot-head" data-action="togglePlot" data-plot="${START_PLOT}">
+          <span class="plate">🍄</span>
+          <div class="pinfo">
+            <h3>Mantar Üretim Alanı</h3>
+            <div class="psub">${starterContainers.length} başlangıç konteyneri</div>
+          </div>
+          <span class="chev">${open ? '▾' : '▸'}</span>
+        </div>
+        ${open ? `<div class="plot-body container-list">${starterContainers.map(c => {
+          const lvl = CONTAINER_LEVELS[c.level];
+          const active = activeSubstrateIn(c.id);
+          const pct = Math.min(100, (active / lvl.capacity) * 100);
+          const slotCount = Math.floor(lvl.capacity / BATCH_WEIGHT);
+          const usedSlots = Math.floor(active / BATCH_WEIGHT);
+          return `
+            <div class="container-list-item" data-action="openContainer" data-id="${c.id}">
+              <div class="head"><h3>Konteyner #${c.id}</h3><span class="sv">Sv.${c.level}</span></div>
+              <div class="name">${lvl.name}</div>
+              <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+              <div class="bar-info"><span>${active}/${lvl.capacity} kg</span><span>${usedSlots}/${slotCount} slot</span></div>
+            </div>`;
+        }).join('')}</div>` : ''}
+      </div>`;
+  }
+
   state.plots.forEach(pl => {
     const prov = getProvince(pl.id);
     if (!prov) return;
