@@ -156,8 +156,14 @@
         <input id="registerPassword2" type="password" autocomplete="new-password" placeholder="Şifreyi tekrar gir" required minlength="6" />
         <button class="auth-submit" type="submit">HESAP OLUŞTUR</button>
       </form>
+      <form class="auth-form" id="verifyForm" hidden>
+        <label for="verificationCode">Gmail adresine gelen 6 haneli kod</label>
+        <input id="verificationCode" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" required minlength="6" maxlength="6" pattern="[0-9]{6}" />
+        <button class="auth-submit" type="submit">KODU DOĞRULA</button>
+        <button class="auth-help" id="resendCode" type="button">Yeni kod gönder</button>
+      </form>
       <div class="auth-status" id="authStatus" role="status" aria-live="polite"></div>
-      <p class="auth-note">Kayıt sonrası e-posta adresine doğrulama bağlantısı gönderilir. Doğrulamadan oyuna giriş yapılamaz.</p>
+      <p class="auth-note">Kayıt sonrası e-posta adresine 6 haneli doğrulama kodu gönderilir. Doğrulamadan oyuna giriş yapılamaz.</p>
     </section>
   </div>
 </div>
@@ -170,13 +176,14 @@
 <div class="fade-out" id="fadeOut"></div>
 
 <script type="module">
-  import { registerWithEmail, loginWithEmail, resetPassword } from './js/auth.js';
+  import { registerWithEmail, loginWithEmail, resetPassword, verifyEmailCode, resendVerificationCode } from './js/auth.js';
   const $ = id => document.getElementById(id);
   let mode = 'login';
   function setMode(next) {
     mode = next;
     $('loginForm').hidden = next !== 'login';
     $('registerForm').hidden = next !== 'register';
+    $('verifyForm').hidden = next !== 'verify';
     $('loginTab').classList.toggle('active', next === 'login');
     $('registerTab').classList.toggle('active', next === 'register');
     $('authStatus').textContent = '';
@@ -203,9 +210,10 @@
     try {
       await registerWithEmail(email,password);
       form.reset();
-      setMode('login');
-      $('loginEmail').value=email;
-      status('Hesabın oluşturuldu. Gmail gelen kutuna doğrulama bağlantısı gönderdik. Spam klasörünü de kontrol et. Doğruladıktan sonra giriş yapabilirsin.');
+      $('loginForm').hidden=true; $('registerForm').hidden=true;
+      $('loginTab').classList.remove('active'); $('registerTab').classList.remove('active');
+      $('verifyForm').hidden=false; mode='verify';
+      status('6 haneli kod Gmail adresine gönderildi. Kod 5 dakika geçerli.');
     } catch(err) {
       const messages={
         'auth/email-already-in-use':'Bu e-posta ile zaten hesap var. Giriş yapmayı dene.',
@@ -215,6 +223,22 @@
       };
       status(messages[err.code] || err.message || 'Kayıt oluşturulamadı.',true);
     } finally { busy(form,false); }
+  });
+  $('verifyForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form=e.currentTarget;
+    busy(form,true);
+    try {
+      await verifyEmailCode($('verificationCode').value);
+      status('E-posta doğrulandı! Oyuna yönlendiriliyorsun.');
+      $('fadeOut').classList.add('on');
+      setTimeout(()=>{window.location.href='game.html';},500);
+    } catch(err) { status(err.message || 'Kod doğrulanamadı.',true); }
+    finally { busy(form,false); }
+  });
+  $('resendCode').addEventListener('click', async()=>{
+    try { await resendVerificationCode(); status('Yeni doğrulama kodu gönderildi.'); }
+    catch(err) { status(err.message || 'Kod gönderilemedi.',true); }
   });
   $('loginForm').addEventListener('submit', async e => {
     e.preventDefault();
@@ -226,7 +250,7 @@
       setTimeout(()=>{window.location.href='game.html';},350);
     } catch(err) {
       const messages={
-        'auth/email-not-verified':'E-posta adresin henüz doğrulanmamış. Gelen kutunu kontrol et.',
+        'auth/email-not-verified':'E-posta adresin henüz doğrulanmamış. Kayıt ekranından kod iste.',
         'auth/invalid-credential':'E-posta veya şifre hatalı.',
         'auth/user-not-found':'Bu hesap bulunamadı. Önce kayıt ol.',
         'auth/wrong-password':'Şifre hatalı.',
