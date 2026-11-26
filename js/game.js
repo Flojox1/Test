@@ -435,7 +435,6 @@ export function renderHUD() {
   moneyEl.classList.toggle('gold', state.money >= 0);
   document.getElementById('statDay').textContent = state.day;
   document.getElementById('statPrice').textContent = '₺' + Math.round(getMushroomSalePrice()) + '/kg';
-  document.getElementById('statPlot').textContent = state.plots.length;
   document.getElementById('statContainer').textContent = state.containers.length;
   document.querySelectorAll('.speed-btn').forEach(btn => {
     btn.classList.toggle('active', parseInt(btn.dataset.speed) === state.speed);
@@ -513,7 +512,7 @@ function renderContainerList() {
   `;
 
   const totCap = state.containers.reduce((s, c) => s + CONTAINER_LEVELS[c.level].capacity, 0);
-  html += `<div class="hint">Toplam substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b> · Bir arsanın adına dokununca içindeki konteynerler açılır.</div>`;
+  html += `<div class="hint">Toplam substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b> · İşletme alanına dokununca içindeki konteynerler açılır.</div>`;
 
   html += `<div class="plot-list">`;
   state.plots.forEach(pl => {
