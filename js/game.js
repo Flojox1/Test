@@ -1,1030 +1,453 @@
-import {
-  state, save, load, resetState,
-  refreshMarket, refreshMasterPool,
-  getMaterialPrice, getMushroomSalePrice,
-  containerById, totalStorageCap, storageUsed,
-  activeSubstrateIn, totalActiveSubstrate, findContainerWithSpace,
-  hasMaterials, consumeMaterials,
-  fmt, fmtMoney, generateMaster,
-  computeDuration, currentContamRisk, getSpeedMultiplier,
-  advanceOffline
-} from './core.js';
-
-import {
-  MATERIALS, RECIPE, METHODS, PHASES, CONTAINER_LEVELS,
-  MAX_CONTAINERS, NEW_CONTAINER_COST, BATCH_WEIGHT,
-  MASTER_TYPES, STAR_SPEED, RESTART_MODES
-} from './data.js';
-
-import { getFrame } from './assets.js';
-import { initChat } from './chat.js';
-
-let activeTab = 'uretim';
-let logicInterval = null;
-
-// Üretim tab görünümü: 'list' veya 'container'
-let uretimView = 'list';
-let viewingContainerId = null;
-
-const tabContent = document.getElementById('tabContent');
-const modalBack = document.getElementById('modalBack');
-const modalEl = document.getElementById('modal');
-
-/* ---------- ADVANCE STATE ---------- */
-export function advanceState() {
-  state.tickCount++;
-  const prevDay = state.day;
-  if (state.tickCount % 12 === 0) state.day++;
-
-  if (state.day !== prevDay) {
-    let salary = 0;
-    state.masters.forEach(m => salary += m.salary);
-    if (salary > 0) state.money -= salary;
-
-    if (state.day % 60 === 0) {
-      refreshMarket();
-      state._marketChanged = true;
-    }
-    if (state.day % 7 === 0) {
-      refreshMasterPool();
-      state.lastMasterRefreshDay = state.day;
-      state._masterPoolChanged = true;
-    }
-  }
-
-  state.batches.forEach(b => {
-    if (['cooled','ready','spent','contaminated'].includes(b.phase)) return;
-    const dur = computeDuration(b);
-    if (dur <= 0) return;
-    b.duration = dur;
-    b.progress += 100 / dur;
-    if (b.progress >= 100) { b.progress = 100; nextPhase(b); }
-  });
-
-  processMasters();
+:root {
+  --bg: #0a0c08; --surface: #121610; --surface-2: #1a2018;
+  --text: #e6e8df; --muted: #7d8574; --border: #2a3226;
+  --green: #6aa84f; --green-bright: #8bc34a; --gold: #e8c56a;
+  --danger: #b02525; --danger-bright: #d63a3a;
+  --star: #f0c24a;
+  --font-head: 'Cinzel', serif; --font-body: 'Inter', sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; }
+body {
+  background: var(--bg); color: var(--text); font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased; overflow: hidden;
+  display:flex; flex-direction:column; height:100dvh;
 }
 
-/* ---------- PHASE ---------- */
-export function nextPhase(b) {
-  switch (b.phase) {
-    case 'pasteurizing':
-      b.phase = 'cooling'; b.progress = 0;
-      b.logs.push('Pastörizasyon tamamlandı. Soğutuluyor.');
-      break;
-    case 'cooling':
-      b.phase = 'cooled'; b.progress = 100;
-      b.logs.push('Soğutuldu. Misel ekimi bekliyor (0.3 kg misel).');
-      break;
-    case 'incubating':
-      b.contamRisk = currentContamRisk(b);
-      if (Math.random() < b.contamRisk) {
-        b.phase = 'contaminated'; b.progress = 0;
-        b.contamTick = state.tickCount;
-        b.logs.push('❌ Kontaminasyon! Parti kaybedildi.');
-      } else {
-        b.phase = 'pinning'; b.progress = 0;
-        b.logs.push('Misel kolonize oldu. Pin oluşumu başlıyor.');
-      }
-      break;
-    case 'pinning':
-      b.phase = 'fruiting'; b.progress = 0;
-      b.logs.push('Pinler oluştu. Meyveleme başladı.');
-      break;
-    case 'fruiting':
-      b.phase = 'ready'; b.progress = 100;
-      b.logs.push('🍄 Hasada hazır!');
-      break;
-    case 'resting':
-      b.phase = 'pinning'; b.progress = 0;
-      b.logs.push('Dinlenme bitti. Yeni flaş pin oluşumu.');
-      break;
-  }
+/* ===== HUD (ÜST BAR) ===== */
+.hud {
+  flex-shrink:0; display:flex; align-items:center; gap:6px;
+  padding:8px 10px; padding-top:calc(8px + env(safe-area-inset-top));
+  border-bottom:1px solid var(--border); background:rgba(18,22,16,0.97); z-index:5;
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+.stat {
+  display:flex; flex-direction:column; padding:3px 8px;
+  border-radius:4px; background:var(--surface-2); flex-shrink:0;
+}
+.stat .lbl { font-size:0.5rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-weight:600; }
+.stat .val { font-family:var(--font-head); font-size:0.85rem; font-weight:700; white-space:nowrap; }
+.val.gold { color:var(--gold); }
+.val.green { color:var(--green-bright); }
+.val.danger { color:var(--danger-bright); }
+.hud-spacer { flex:1; min-width:4px; }
+
+.speed-group { display:flex; gap:2px; flex-shrink:0; }
+.speed-btn {
+  padding:6px 8px; background:var(--surface-2); color:var(--muted);
+  border:1px solid var(--border); border-radius:3px; font-family:var(--font-body);
+  font-size:0.62rem; font-weight:700; letter-spacing:0.5px; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.speed-btn.active { background:var(--green); color:#0a0c08; border-color:var(--green); }
+
+#resetBtn {
+  flex-shrink:0; padding:7px 10px; background:transparent; color:var(--muted);
+  border:1px solid var(--border); border-radius:4px; font-family:var(--font-body);
+  font-size:0.62rem; letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+#resetBtn:hover { color:var(--danger-bright); border-color:var(--danger); }
+
+/* ===== SEKMELER ===== */
+.tabs {
+  flex-shrink:0; display:flex; border-bottom:1px solid var(--border);
+  background:var(--surface); overflow-x:auto; -webkit-overflow-scrolling:touch;
+}
+.tab {
+  flex:1; min-width:70px; padding:11px 6px; background:transparent;
+  color:var(--muted); border:none; border-bottom:2px solid transparent;
+  font-family:var(--font-body); font-size:0.64rem; font-weight:600;
+  letter-spacing:1px; text-transform:uppercase; cursor:pointer;
+  -webkit-tap-highlight-color:transparent; white-space:nowrap;
+  transition:color 0.2s, border-color 0.2s;
+}
+.tab.active { color:var(--green-bright); border-bottom-color:var(--green-bright); }
+.tab:hover { color:var(--text); }
+
+/* ===== İÇERİK ALANI ===== */
+.content { flex:1; min-height:0; overflow-y:auto; padding:12px 12px 100px; -webkit-overflow-scrolling:touch; }
+
+.section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:8px; flex-wrap:wrap; }
+.section-head h2 { font-family:var(--font-head); font-size:1rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; }
+
+/* ===== BUTONLAR & UYARILAR ===== */
+.btn {
+  padding:10px 16px; border-radius:4px; border:none; font-family:var(--font-body);
+  font-size:0.72rem; font-weight:600; letter-spacing:1px; text-transform:uppercase;
+  cursor:pointer; -webkit-tap-highlight-color:transparent; transition:background 0.2s, transform 0.1s;
+}
+.btn:active { transform:scale(0.97); }
+.btn-green { background:var(--green); color:#0a0c08; }
+.btn-green:hover { background:var(--green-bright); }
+.btn-ghost { background:transparent; color:var(--text); border:1px solid var(--border); }
+.btn-ghost:hover { border-color:var(--muted); }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-danger:hover { background:var(--danger-bright); }
+.btn:disabled { opacity:0.35; cursor:not-allowed; }
+
+.hint {
+  background:var(--surface-2); border-left:3px solid var(--green);
+  padding:10px 12px; border-radius:4px; font-size:0.74rem; color:var(--muted);
+  line-height:1.5; margin-bottom:12px;
+}
+.hint b { color:var(--text); }
+.hint.danger { border-left-color:var(--danger); }
+.hint.warn { border-left-color:var(--gold); }
+
+/* ===== KONTEYNER LİSTESİ ===== */
+.container-list { display:flex; flex-direction:column; gap:10px; }
+.container-list-item {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:14px; cursor:pointer;
+  transition:border-color 0.2s, transform 0.1s;
+  -webkit-tap-highlight-color:transparent;
+}
+.container-list-item:hover { border-color:var(--green); }
+.container-list-item:active { transform:scale(0.98); }
+.container-list-item .head {
+  display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;
+}
+.container-list-item .head h3 { font-family:var(--font-head); font-size:0.95rem; font-weight:700; }
+.container-list-item .head .sv {
+  font-size:0.62rem; color:var(--green-bright); letter-spacing:1px;
+  text-transform:uppercase; font-weight:600;
+}
+.container-list-item .name { font-size:0.7rem; color:var(--muted); margin-bottom:10px; }
+.container-list-item .bar {
+  height:6px; background:var(--surface-2); border-radius:3px; overflow:hidden;
+}
+.container-list-item .bar .fill {
+  height:100%; background:var(--green); transition:width 0.3s;
+}
+.container-list-item .bar-info {
+  display:flex; justify-content:space-between; font-size:0.6rem;
+  color:var(--muted); margin-top:6px; letter-spacing:0.5px;
+}
+.container-list-item.add {
+  border-style:dashed; text-align:center;
+}
+.container-list-item.add h3 {
+  color:var(--green-bright); margin-bottom:4px; font-size:0.9rem;
+}
+.container-list-item.add .price {
+  font-family:var(--font-head); color:var(--gold); font-weight:700; font-size:0.9rem;
 }
 
-/* ---------- PARTİ ---------- */
-export function createBatch(method, containerId) {
-  if (!hasMaterials()) { alert('Malzeme eksik. Pazar sekmesinden al.'); return; }
-  let cont;
-  if (containerId != null) {
-    cont = state.containers.find(c => c.id === containerId);
-    if (!cont) return;
-    if (activeSubstrateIn(cont.id) + BATCH_WEIGHT > CONTAINER_LEVELS[cont.level].capacity) {
-      alert('Bu konteynerde boş slot yok.'); return;
-    }
-  } else {
-    cont = findContainerWithSpace();
-    if (!cont) { alert('Tüm konteynerler dolu.'); return; }
-  }
-  const m = METHODS[method];
-  if (state.money < m.cost) { alert('Ek maliyet için para yetersiz.'); return; }
+/* ===== KONTEYNER İÇ GÖRÜNÜMÜ ===== */
+.container-view-head {
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--surface); padding:12px 14px;
+  border:1px solid var(--border); border-radius:6px;
+  margin-bottom:12px; gap:10px;
+}
+.container-view-head .left {
+  display:flex; align-items:center; gap:10px; min-width:0; flex:1;
+}
+.container-view-head .x-btn {
+  background:transparent; border:1px solid var(--border); color:var(--muted);
+  width:34px; height:34px; border-radius:4px; cursor:pointer;
+  font-size:1.2rem; display:flex; align-items:center; justify-content:center;
+  -webkit-tap-highlight-color:transparent; flex-shrink:0;
+  transition:color 0.2s, border-color 0.2s;
+}
+.container-view-head .x-btn:hover { color:var(--danger-bright); border-color:var(--danger); }
+.container-view-head .title-block { min-width:0; }
+.container-view-head .title-block h3 {
+  font-family:var(--font-head); font-size:0.95rem; font-weight:700;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.container-view-head .title-block .name {
+  font-size:0.6rem; color:var(--muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.container-view-head .btn { flex-shrink:0; padding:9px 14px; font-size:0.66rem; }
 
-  consumeMaterials();
-  state.money -= m.cost;
-
-  const b = {
-    id: Date.now() + Math.random(),
-    containerId: cont.id,
-    phase: 'pasteurizing',
-    progress: 0,
-    duration: m.duration,
-    method,
-    contamRisk: 0,
-    flush: 1,
-    logs: [`Kompost karıştırıldı. ${m.name} başladı. Konteyner #${cont.id}.`]
-  };
-  b.contamRisk = currentContamRisk(b);
-  state.batches.push(b);
-  closeModal();
-  render();
-  save();
+.container-detail {
+  background: var(--surface);
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 0 12px rgba(106,168,79,0.08);
 }
 
-export function inoculate(id, silent) {
-  const b = state.batches.find(x => x.id === id);
-  if (!b || b.phase !== 'cooled') return false;
-  if (state.inventory.spawn < 0.3) {
-    if (!silent) alert('0.3 kg misel gerekli.');
-    else b.logs.push('⚠️ Misel yok, usta ekemedi.');
-    return false;
-  }
-  state.inventory.spawn -= 0.3;
-  b.phase = 'incubating';
-  b.progress = 0;
-  b.logs.push(silent ? '💉 Aşılama ustası misel ekledi.' : 'Misel ekildi. Kuluçka başladı.');
-  return true;
+/* ===== SLOT GRID ===== */
+.slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
-export function harvest(id, silent) {
-  const b = state.batches.find(x => x.id === id);
-  if (!b || b.phase !== 'ready') return false;
-
-  const base = [2.2, 1.2, 0.6][b.flush - 1] || 0;
-  const cont = state.containers.find(c => c.id === b.containerId);
-  const contLevel = CONTAINER_LEVELS[cont ? cont.level : 1];
-  const climateMult = 0.6 + contLevel.climate * 0.6;
-  const harvMaster = state.masters.find(m => m.type === 'harvest');
-  const yieldBonus = harvMaster ? 1 + (harvMaster.stars - 1) * 0.03 : 1;
-  const yieldKg = +(base * climateMult * yieldBonus).toFixed(2);
-
-  if (storageUsed() + yieldKg > totalStorageCap()) {
-    if (!silent) alert('Depo dolu! Önce mantar sat.');
-    else b.logs.push('⚠️ Depo dolu, usta hasat edemedi.');
-    return false;
-  }
-
-  state.inventory.mushroom += yieldKg;
-  b.flush += 1;
-  b.logs.push(silent
-    ? `🍄 Usta hasat etti: ${yieldKg} kg (Flaş ${b.flush - 1}).`
-    : `Hasat: ${yieldKg} kg mantar (Flaş ${b.flush - 1}).`);
-
-  if (b.flush > 3) {
-    b.phase = 'spent'; b.progress = 0;
-    b.logs.push('3 flaş tamamlandı. Parti tükendi.');
-    handleBatchRestart(b);
-  } else {
-    b.phase = 'resting'; b.progress = 0;
-    b.logs.push('Parti dinlenmeye alındı.');
-  }
-  return true;
+.slot {
+  aspect-ratio: 1; max-height: 130px;
+  border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 6px; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
 }
 
-function handleBatchRestart(b) {
-  if (state.masters.length === 0) return;
-  const mode = state.masterRestart || 'stop';
-  if (mode === 'stop') { b.logs.push('Durdur modu: yeni parti yok.'); return; }
-  if (mode === 'autobuy') tryBuyRecipeForRestart();
-  if (!hasMaterials()) { b.logs.push('Malzeme yok, yeni parti başlatılamadı.'); return; }
-  consumeMaterials();
-  const method = state.masterMethod || 'hot';
-  b.phase = 'pasteurizing';
-  b.method = method;
-  b.progress = 0;
-  b.flush = 1;
-  b.logs.push('🔄 Yeni parti başlatıldı: ' + METHODS[method].name + '.');
+.slot:active { transform: scale(0.96); }
+
+.slot.empty {
+  border-style: dashed; color: var(--green-bright);
+  font-size: 2rem; font-weight: 300;
+  background: var(--surface-2);
+}
+.slot.empty:hover { border-color: var(--green); background: var(--surface); }
+
+.slot.filled { border-color: var(--green); }
+.slot.filled.ready {
+  border-color: var(--green-bright);
+  box-shadow: 0 0 12px rgba(139,195,74,0.3);
+}
+.slot.filled.bad { border-color: var(--danger); }
+
+.slot-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  margin-bottom: 4px;
 }
 
-function tryBuyRecipeForRestart() {
-  const need = {};
-  let missing = false;
-  for (const [mat, qty] of Object.entries(RECIPE)) {
-    const have = state.inventory[mat] || 0;
-    if (have < qty) { need[mat] = qty - have; missing = true; }
-  }
-  if (state.masters.some(m => m.type === 'inoculate')) {
-    const needSpawn = Math.max(0, 0.3 - (state.inventory.spawn || 0));
-    if (needSpawn > 0) { need.spawn = needSpawn; missing = true; }
-  }
-  if (!missing) return;
-  let cost = 0;
-  for (const [mat, qty] of Object.entries(need)) cost += getMaterialPrice(mat) * qty;
-  if (state.money < cost) return;
-  state.money -= cost;
-  for (const [mat, qty] of Object.entries(need)) {
-    state.inventory[mat] = (state.inventory[mat] || 0) + qty;
-  }
+.slot-phase {
+  font-size: 0.48rem;
+  color: var(--muted);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.1;
+  margin-bottom: 4px;
 }
 
-export function manualRestart(id) {
-  const b = state.batches.find(x => x.id === id);
-  if (!b || b.phase !== 'spent') return;
-  if (!hasMaterials()) { alert('Malzeme yok. Pazar’dan al.'); return; }
-  consumeMaterials();
-  const method = state.masterMethod || 'hot';
-  b.phase = 'pasteurizing';
-  b.method = method;
-  b.progress = 0;
-  b.flush = 1;
-  b.logs.push('Manuel yeniden başlatıldı: ' + METHODS[method].name);
-  render(); save();
+.slot-bar {
+  width: 100%; height: 3px; background: var(--surface-2);
+  border-radius: 2px; overflow: hidden; margin-top: auto;
+}
+.slot-fill {
+  height: 100%; background: var(--green); transition: width 0.4s;
 }
 
-export function removeBatch(id) {
-  const idx = state.batches.findIndex(x => x.id === id);
-  if (idx === -1) return;
-  const b = state.batches[idx];
-  if (!['spent','contaminated'].includes(b.phase)) {
-    if (!confirm('Bu parti henüz bitmedi. Kaldırmak istediğine emin misin?')) return;
-  }
-  state.batches.splice(idx, 1);
-  render(); save();
+/* Ölü Partiler */
+.dead-batches { margin-top:16px; }
+.dead-title {
+  font-size:0.62rem; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--muted); font-weight:600; margin-bottom:8px;
 }
-
-/* ---------- USTALAR ---------- */
-export function hireMaster(id) {
-  const idx = state.availableMasters.findIndex(m => m.id === id);
-  if (idx === -1) return;
-  const master = state.availableMasters[idx];
-  if (state.masters.some(m => m.type === master.type)) {
-    alert(`Zaten bir ${MASTER_TYPES[master.type].name} var.`);
-    return;
-  }
-  state.masters.push(master);
-  state.availableMasters.splice(idx, 1);
-  render(); save();
+.dead-batch {
+  display:flex; justify-content:space-between; align-items:center;
+  background:var(--surface); border:1px solid var(--border); border-radius:4px;
+  padding:10px 12px; margin-bottom:6px; font-size:0.72rem; color:var(--muted);
 }
+.dead-batch .btn { padding:6px 10px; font-size:0.6rem; }
 
-export function fireMaster(id) {
-  const idx = state.masters.findIndex(m => m.id === id);
-  if (idx === -1) return;
-  const master = state.masters[idx];
-  if (!confirm(`${master.name} ${master.surname}'i kovmak istediğine emin misin?`)) return;
-  state.masters.splice(idx, 1);
-  render(); save();
+/* ===== GENEL KUTULAR ===== */
+.container-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+  padding:14px; margin-bottom:12px;
 }
+.container-card h3 { font-family:var(--font-head); font-size:1rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:2px; }
+.container-card .lvl { font-size:0.62rem; letter-spacing:2px; text-transform:uppercase; color:var(--green-bright); margin-bottom:10px; display:block; }
+.stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:12px; }
+.stat-cell { background:var(--surface-2); padding:7px 9px; border-radius:4px; }
+.stat-cell .k { font-size:0.52rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+.stat-cell .v { font-family:var(--font-head); font-size:0.85rem; font-weight:700; }
+.storage-bar { height:10px; background:var(--surface-2); border-radius:5px; overflow:hidden; margin:8px 0 14px; }
+.storage-bar .fill { height:100%; background:var(--gold); border-radius:5px; transition:width 0.3s; }
 
-export function processMasters() {
-  const inoc = state.masters.find(m => m.type === 'inoculate');
-  const harv = state.masters.find(m => m.type === 'harvest');
-
-  state.batches.forEach(b => {
-    if (b.phase === 'cooled' && inoc) {
-      if (state.inventory.spawn < 0.3) {
-        const need = 0.3 - state.inventory.spawn;
-        const cost = getMaterialPrice('spawn') * need;
-        if (state.money >= cost) {
-          state.money -= cost;
-          state.inventory.spawn += need;
-          b.logs.push(`💉 Usta ${need.toFixed(2)} kg misel satın aldı (-₺${Math.round(cost)}).`);
-        } else {
-          b.logs.push('⚠️ Usta misel alamadı: para yetersiz.');
-        }
-      }
-      inoculate(b.id, true);
-    }
-    if (b.phase === 'ready' && harv) harvest(b.id, true);
-  });
-
-  if (state.masters.length > 0) {
-    for (let i = state.batches.length - 1; i >= 0; i--) {
-      const b = state.batches[i];
-      if (b.phase === 'contaminated' && typeof b.contamTick === 'number'
-          && (state.tickCount - b.contamTick) >= 6) {
-        state.batches.splice(i, 1);
-      }
-    }
-  }
+/* ===== PAZAR ===== */
+.mat-list { display:flex; flex-direction:column; gap:10px; }
+.mat {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:5px; padding:10px 12px;
 }
-
-/* ---------- PAZAR ---------- */
-export function addToCart(mat, qty) {
-  if (!state.cart) state.cart = {};
-  state.cart[mat] = (state.cart[mat] || 0) + qty;
-  save(); renderPazar();
+.mat-main { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.mat-main .ico { font-size:1.4rem; flex-shrink:0; }
+.mat-main .info { flex:1; min-width:0; }
+.mat-main .info .name { font-family:var(--font-head); font-size:0.82rem; font-weight:700; }
+.mat-main .info .sub { font-size:0.62rem; color:var(--muted); }
+.mat-main .own { font-family:var(--font-head); font-size:0.78rem; color:var(--green-bright); font-weight:700; white-space:nowrap; }
+.mat-controls { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.mat-controls .btn { padding:7px 10px; font-size:0.62rem; flex-shrink:0; }
+.qty-input {
+  flex:1; min-width:70px; padding:7px 10px; background:var(--surface-2);
+  border:1px solid var(--border); border-radius:4px;
+  color:var(--text); font-family:var(--font-body); font-size:0.72rem; outline:none;
 }
-export function cartTotal() {
-  let t = 0;
-  for (const k in state.cart) t += getMaterialPrice(k) * state.cart[k];
-  return t;
+.qty-input:focus { border-color:var(--green); }
+.qty-input::placeholder { color:var(--muted); font-size:0.65rem; }
+.cart-box {
+  background:var(--surface); border:1px solid var(--green);
+  border-radius:5px; padding:14px; margin-top:14px;
 }
-export function buyCart() {
-  const keys = Object.keys(state.cart).filter(k => state.cart[k] > 0);
-  if (!keys.length) return;
-  const total = cartTotal();
-  if (state.money < total) { alert('Para yetersiz. Toplam: ' + fmtMoney(total)); return; }
-  state.money -= total;
-  keys.forEach(k => state.inventory[k] += state.cart[k]);
-  state.cart = {};
-  save(); render();
+.cart-box h3 {
+  font-family:var(--font-head); font-size:0.9rem; text-transform:uppercase;
+  letter-spacing:1px; margin-bottom:10px; color:var(--green-bright);
 }
-export function sellMushrooms(qty) {
-  const amount = qty === 'all' ? state.inventory.mushroom : Math.min(qty, state.inventory.mushroom);
-  if (amount <= 0) return;
-  const pricePerKg = getMushroomSalePrice();
-  state.money += amount * pricePerKg;
-  state.inventory.mushroom -= amount;
-  render(); save();
+.cart-row {
+  display:flex; align-items:center; gap:8px;
+  font-size:0.72rem; padding:7px 0; border-bottom:1px solid var(--border);
 }
-
-/* ---------- KONTEYNER ---------- */
-export function doUpgrade(containerId) {
-  const cont = state.containers.find(c => c.id === containerId);
-  if (!cont) return;
-  const next = cont.level + 1;
-  if (next >= CONTAINER_LEVELS.length) return;
-  const lvl = CONTAINER_LEVELS[next];
-  if (state.money < lvl.cost) { alert('Para yetersiz.'); return; }
-  state.money -= lvl.cost;
-  cont.level = next;
-  render(); save();
+.cart-row span:first-child { flex:1; }
+.cart-row span:nth-child(2) { color:var(--gold); font-family:var(--font-head); font-weight:700; }
+.cart-rm { background:transparent; border:none; color:var(--muted); font-size:1.15rem; cursor:pointer; padding:0 4px; line-height:1; }
+.cart-rm:hover { color:var(--danger-bright); }
+.cart-total { display:flex; justify-content:space-between; align-items:center; padding:12px 0 6px; }
+.cart-total span:first-child { font-size:0.7rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+.cart-total .big { font-family:var(--font-head); font-size:1.2rem; color:var(--gold); font-weight:700; }
+.cart-btns { display:flex; gap:8px; margin-top:8px; }
+.cart-btns .btn { flex:1; }
+.sell-box {
+  background:var(--surface); border:1px solid var(--border); border-radius:5px;
+  padding:14px; margin-top:14px;
 }
+.sell-box h3 { font-family:var(--font-head); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+.sell-row { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+.sell-row .big { font-family:var(--font-head); font-size:1.2rem; color:var(--gold); font-weight:700; }
 
-export function buyNewContainer() {
-  if (state.containers.length >= MAX_CONTAINERS) { alert('Maksimum konteyner sayısı.'); return; }
-  if (state.money < NEW_CONTAINER_COST) { alert('Para yetersiz.'); return; }
-  if (!confirm(`Yeni konteyner için ${fmtMoney(NEW_CONTAINER_COST)} ödenecek.`)) return;
-  state.money -= NEW_CONTAINER_COST;
-  const newId = Math.max(...state.containers.map(c => c.id), 0) + 1;
-  state.containers.push({ id: newId, level: 1 });
-  render(); save();
+/* ===== USTALAR ===== */
+.master-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:5px;
+  padding:12px 14px; margin-bottom:10px;
 }
-
-/* ---------- RENDER ---------- */
-export function renderHUD() {
-  const moneyEl = document.getElementById('statMoney');
-  moneyEl.textContent = fmtMoney(state.money);
-  moneyEl.classList.toggle('danger', state.money < 0);
-  moneyEl.classList.toggle('gold', state.money >= 0);
-  document.getElementById('statDay').textContent = state.day;
-  document.getElementById('statPrice').textContent = '₺' + Math.round(getMushroomSalePrice()) + '/kg';
-  document.getElementById('statContainer').textContent = state.containers.length;
-  document.querySelectorAll('.speed-btn').forEach(btn => {
-    btn.classList.toggle('active', parseInt(btn.dataset.speed) === state.speed);
-  });
+.master-card.hired { border-color:var(--green); box-shadow:0 0 12px rgba(106,168,79,0.1); }
+.master-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; gap:8px; }
+.master-name { font-family:var(--font-head); font-size:0.95rem; font-weight:700; letter-spacing:0.5px; }
+.master-stars { color:var(--star); font-size:0.9rem; letter-spacing:1px; white-space:nowrap; }
+.master-info { display:flex; justify-content:space-between; align-items:center; font-size:0.68rem; color:var(--muted); margin-bottom:10px; gap:8px; flex-wrap:wrap; }
+.master-info .mtype { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:3px; background:var(--surface-2); color:var(--text); font-weight:600; letter-spacing:0.5px; }
+.master-info .msalary { color:var(--gold); font-family:var(--font-head); font-weight:700; }
+.master-actions { display:flex; gap:6px; }
+.master-actions .btn { flex:1; padding:8px 12px; font-size:0.66rem; }
+.master-effect { font-size:0.65rem; color:var(--muted); line-height:1.45; padding:6px 0; border-top:1px dashed var(--border); margin-bottom:8px; }
+.master-effect b { color:var(--green-bright); }
+.setting-row {
+  display:flex; flex-direction:column; gap:4px; margin-bottom:12px;
+  background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:10px 12px;
 }
-
-export function render() {
-  renderHUD();
-  if (activeTab === 'uretim') renderUretim();
-  else if (activeTab === 'pazar') renderPazar();
-  else if (activeTab === 'ustalar') renderUstalar();
-  else if (activeTab === 'depo') renderDepo();
+.setting-row label { font-size:0.62rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-weight:600; }
+.setting-select {
+  padding:9px 10px; background:var(--surface-2); border:1px solid var(--border);
+  border-radius:4px; color:var(--text); font-family:var(--font-body); font-size:0.82rem;
+  outline:none; cursor:pointer;
 }
+.setting-select:focus { border-color:var(--green); }
 
-export function renderLive() {
-  renderHUD();
-  
-  if (activeTab === 'uretim') {
-    if (uretimView === 'container' && viewingContainerId != null) {
-      updateLiveContainerView();
-    } else {
-      renderUretim();
-    }
-  }
-  else if (activeTab === 'depo') renderDepo();
-  else if (activeTab === 'pazar' && state._marketChanged) {
-    renderPazar(); state._marketChanged = false;
-  } else if (activeTab === 'ustalar' && state._masterPoolChanged) {
-    renderUstalar(); state._masterPoolChanged = false;
-  }
+/* ===== MODAL ===== */
+.modal-back {
+  position:fixed; inset:0; z-index:30; background:rgba(0,0,0,0.8);
+  backdrop-filter:blur(4px); display:none; align-items:center; justify-content:center; padding:16px;
 }
-
-// Konteyner içindeyken sayfayı yenilemeden resimleri ve barları günceller
-function updateLiveContainerView() {
-  const cont = state.containers.find(c => c.id === viewingContainerId);
-  if (!cont) return;
-  
-  const activeBatches = state.batches.filter(b => b.containerId === cont.id && !['spent','contaminated'].includes(b.phase));
-  
-  activeBatches.forEach(b => {
-    const slotEl = document.querySelector(`.slot[data-id="${b.id}"]`);
-    if (!slotEl) return;
-    
-    const fill = slotEl.querySelector('.slot-fill');
-    if (fill) fill.style.width = `${b.progress}%`;
-    
-    const phaseText = slotEl.querySelector('.slot-phase');
-    if (phaseText && PHASES[b.phase]) {
-      phaseText.textContent = PHASES[b.phase].label;
-    }
-
-    const img = slotEl.querySelector('.slot-bg');
-    if (img) {
-      const newUrl = getFrame(b.phase);
-      if (img.getAttribute('src') !== newUrl) {
-        img.style.opacity = '0'; 
-        setTimeout(() => {
-          img.src = newUrl;
-          img.style.opacity = '1';
-        }, 300);
-      }
-    }
-  });
+.modal-back.on { display:flex; }
+.modal {
+  background:var(--surface); border:1px solid var(--border); border-radius:6px;
+  padding:22px 18px; width:100%; max-width:440px; max-height:90vh; overflow-y:auto;
+  animation:pop 0.2s ease both;
 }
-
-/* ---------- ÜRETİM ---------- */
-export function renderUretim() {
-  if (uretimView === 'container' && viewingContainerId != null) {
-    const cont = state.containers.find(c => c.id === viewingContainerId);
-    if (!cont) { uretimView = 'list'; viewingContainerId = null; return renderUretim(); }
-    renderContainerView(cont);
-  } else {
-    renderContainerList();
-  }
+@keyframes pop { from { opacity:0; transform:scale(0.95); } to { opacity:1; transform:scale(1); } }
+.modal h2 { font-family:var(--font-head); font-size:1.05rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+.modal .sub { font-size:0.64rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); margin-bottom:16px; display:block; }
+.recipe {
+  background:var(--surface-2); border-radius:4px; padding:10px 12px;
+  font-size:0.72rem; color:var(--muted); line-height:1.7; margin-bottom:14px;
 }
-
-function renderContainerList() {
-  let html = `
-    <div class="section-head">
-      <h2>Üretim · Konteynerler</h2>
-      <button class="btn btn-ghost" data-action="skipDay">⏩ 1 Gün</button>
-    </div>
-  `;
-
-  const totCap = state.containers.reduce((s, c) => s + CONTAINER_LEVELS[c.level].capacity, 0);
-  html += `<div class="hint">Toplam substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b></div>`;
-
-  html += `<div class="container-list">`;
-  state.containers.forEach(c => {
-    const lvl = CONTAINER_LEVELS[c.level];
-    const active = activeSubstrateIn(c.id);
-    const pct = Math.min(100, (active / lvl.capacity) * 100);
-    const slotCount = Math.floor(lvl.capacity / BATCH_WEIGHT);
-    const usedSlots = Math.floor(active / BATCH_WEIGHT);
-    html += `
-      <div class="container-list-item" data-action="openContainer" data-id="${c.id}">
-        <div class="head">
-          <h3>Konteyner #${c.id}</h3>
-          <span class="sv">Sv.${c.level}</span>
-        </div>
-        <div class="name">${lvl.name}</div>
-        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-        <div class="bar-info">
-          <span>${active}/${lvl.capacity} kg</span>
-          <span>${usedSlots}/${slotCount} slot</span>
-        </div>
-      </div>
-    `;
-  });
-  if (state.containers.length < MAX_CONTAINERS) {
-    html += `
-      <div class="container-list-item add" data-action="buyContainer">
-        <h3>+ Yeni Konteyner</h3>
-        <div class="price">${fmtMoney(NEW_CONTAINER_COST)}</div>
-      </div>
-    `;
-  }
-  html += `</div>`;
-
-  tabContent.innerHTML = html;
+.recipe b { color:var(--text); }
+.method {
+  display:flex; align-items:center; gap:10px; background:var(--surface-2);
+  border:1px solid var(--border); border-radius:5px; padding:12px; margin-bottom:8px;
+  cursor:pointer; transition:border-color 0.2s; -webkit-tap-highlight-color:transparent;
 }
+.method:hover { border-color:var(--green); }
+.method.disabled { opacity:0.4; cursor:not-allowed; }
+.method .m-ico { font-size:1.4rem; flex-shrink:0; }
+.method .m-info { flex:1; }
+.method .m-info .m-name { font-family:var(--font-head); font-size:0.85rem; font-weight:700; text-transform:uppercase; }
+.method .m-info .m-desc { font-size:0.64rem; color:var(--muted); margin-top:2px; }
+.modal .close { margin-top:10px; width:100%; padding:11px; background:transparent; color:var(--muted); border:1px solid var(--border); border-radius:4px; font-family:var(--font-body); font-size:0.72rem; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; }
+.modal .close:hover { color:var(--text); }
 
-function renderContainerView(cont) {
-  const lvl = CONTAINER_LEVELS[cont.level];
-  const next = CONTAINER_LEVELS[cont.level + 1];
-  const active = activeSubstrateIn(cont.id);
-  const slotCount = Math.floor(lvl.capacity / BATCH_WEIGHT);
-  const batchesHere = state.batches.filter(b => b.containerId === cont.id);
-  const activeBatches = batchesHere.filter(b => !['spent','contaminated'].includes(b.phase));
-  const deadBatches = batchesHere.filter(b => ['spent','contaminated'].includes(b.phase));
-
-  const bgImage = getFrame('container');
-
-  let html = `
-    <div class="container-view-head">
-      <div class="left">
-        <button class="x-btn" data-action="exitContainer" aria-label="Geri">×</button>
-        <div class="title-block">
-          <h3>Konteyner #${cont.id}</h3>
-          <div class="name">${lvl.name} · Sv.${cont.level}</div>
-        </div>
-      </div>
-      ${next ? `<button class="btn btn-green" data-action="openUpgrade" data-id="${cont.id}">Yükselt</button>` : ''}
-    </div>
-    
-    <div class="container-interior" style="background-image: url('${bgImage}');">
-      <div class="container-overlay">
-        <div class="hint">
-          Substrat: <b>${active}/${lvl.capacity} kg</b> ·
-          Slot: <b>${activeBatches.length}/${slotCount}</b> ·
-          İklim: <b>%${Math.round(lvl.climate*100)}</b>
-        </div>
-
-        <div class="slot-grid" id="slotGrid">
-  `;
-
-  for (let i = 0; i < slotCount; i++) {
-    if (i < activeBatches.length) {
-      const b = activeBatches[i];
-      const ph = PHASES[b.phase] || { label: '?' };
-      const isReady = b.phase === 'ready';
-      const isBad = b.phase === 'contaminated';
-      const imgUrl = getFrame(b.phase);
-      
-      html += `
-        <div class="slot filled ${isReady?'ready':''} ${isBad?'bad':''}" data-action="openBatch" data-id="${b.id}">
-          <img src="${imgUrl}" class="slot-bg" alt="${ph.label}" />
-          <div class="slot-overlay">
-            <div class="slot-phase">${ph.label}</div>
-            <div class="slot-bar"><div class="slot-fill" style="width:${b.progress||0}%"></div></div>
-          </div>
-        </div>
-      `;
-    } else {
-      html += `<div class="slot empty" data-action="newBatchIn" data-container="${cont.id}" aria-label="Yeni Parti">+</div>`;
-    }
-  }
-  
-  html += `
-        </div>
-      </div>
-    </div>
-  `;
-
-  if (deadBatches.length > 0) {
-    html += `<div class="dead-batches"><div class="dead-title">Temizlenmesi Gerekenler</div>`;
-    deadBatches.forEach(b => {
-      const isBad = b.phase === 'contaminated';
-      html += `
-        <div class="dead-batch">
-          <span>${isBad?'❌ Kontamine':'✅ Tükendi'} · Flaş ${b.flush-1}/3</span>
-          <button class="btn btn-danger" data-action="remove" data-id="${b.id}">Kaldır</button>
-        </div>
-      `;
-    });
-    html += `</div>`;
-  }
-
-  tabContent.innerHTML = html;
+/* Parti Detay (Modal İçi) */
+.batch-detail { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.batch-detail .bd-row {
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:0.78rem; padding:6px 0; border-bottom:1px solid var(--border);
 }
+.batch-detail .bd-row:last-child { border-bottom:none; }
+.batch-detail .bd-row .k { color:var(--muted); }
+.batch-detail .bd-row .v { font-family:var(--font-head); font-weight:700; color:var(--text); }
+.batch-detail .bd-row .v.danger { color:var(--danger-bright); }
+.batch-detail .bd-row .v.green { color:var(--green-bright); }
 
-/* ---------- PAZAR ---------- */
-export function renderPazar() {
-  let html = `<div class="section-head"><h2>Pazar</h2></div>`;
-  const next = 60 - (state.day % 60);
-  html += `<div class="hint">
-    Piyasa: <b>Flaş başına ~₺${state.market.profitPerFlush}</b> kâr ·
-    Malzeme <b>${state.market.materialMult.toFixed(2)}×</b> ·
-    Sonraki: <b>${next} gün</b>
-  </div>`;
+/* Yükseltme Karşılaştırma */
+.upgrade-compare { display:flex; gap:10px; margin-bottom:14px; }
+.upgrade-compare .col { flex:1; background:var(--surface-2); border-radius:5px; padding:12px 10px; }
+.upgrade-compare .col h4 { font-size:0.58rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); font-weight:600; margin-bottom:8px; }
+.upgrade-compare .col .row { display:flex; justify-content:space-between; align-items:center; font-size:0.68rem; margin-bottom:5px; }
+.upgrade-compare .col .row:last-child { margin-bottom:0; }
+.upgrade-compare .col .row .k { color:var(--muted); }
+.upgrade-compare .col .row .v { font-family:var(--font-head); font-weight:700; color:var(--text); }
+.upgrade-compare .col .row .v.up { color:var(--green-bright); }
+.upgrade-cost { background:var(--surface-2); border-radius:5px; padding:12px; text-align:center; margin-bottom:14px; }
+.upgrade-cost .lbl { font-size:0.6rem; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:4px; }
+.upgrade-cost .val { font-family:var(--font-head); font-size:1.3rem; font-weight:700; color:var(--gold); }
+.upgrade-cost .val.poor { color:var(--danger-bright); }
 
-  html += `<div class="mat-list">`;
-  Object.entries(MATERIALS).forEach(([key, m]) => {
-    const inCart = state.cart[key] || 0;
-    const owned = (+state.inventory[key]).toFixed(key === 'bag' ? 0 : 1);
-    const price = getMaterialPrice(key);
-    html += `
-      <div class="mat">
-        <div class="mat-main">
-          <div class="ico">${m.icon}</div>
-          <div class="info">
-            <div class="name">${m.name}</div>
-            <div class="sub">₺${price}/${m.unit}${inCart ? ' · Sepette ' + inCart : ''}</div>
-          </div>
-          <div class="own">${owned} ${m.unit}</div>
-        </div>
-        <div class="mat-controls">
-          <button class="btn btn-ghost" data-action="cartAdd" data-mat="${key}" data-qty="1">+1</button>
-          <button class="btn btn-ghost" data-action="cartAdd" data-mat="${key}" data-qty="10">+10</button>
-          <input type="number" class="qty-input" data-mat="${key}" placeholder="Miktar..." min="1" inputmode="numeric" />
-          <button class="btn btn-ghost" data-action="cartAddCustom" data-mat="${key}">Ekle</button>
-        </div>
-      </div>
-    `;
-  });
-  html += `</div>`;
-
-  const keys = Object.keys(state.cart).filter(k => state.cart[k] > 0);
-  if (keys.length > 0) {
-    let total = 0;
-    let rows = '';
-    keys.forEach(k => {
-      const m = MATERIALS[k];
-      const q = state.cart[k];
-      const sub = getMaterialPrice(k) * q;
-      total += sub;
-      rows += `
-        <div class="cart-row">
-          <span>${m.icon} ${m.name} × ${q}</span>
-          <span>₺${sub}</span>
-          <button class="cart-rm" data-action="cartRemove" data-mat="${k}">×</button>
-        </div>
-      `;
-    });
-    html += `
-      <div class="cart-box">
-        <h3>Sepet</h3>
-        ${rows}
-        <div class="cart-total"><span>Toplam</span><span class="big">₺${total}</span></div>
-        <div class="cart-btns">
-          <button class="btn btn-ghost" data-action="cartClear">Temizle</button>
-          <button class="btn btn-green" data-action="cartBuy">Satın Al</button>
-        </div>
-      </div>
-    `;
-  }
-
-  const price = getMushroomSalePrice();
-  html += `
-    <div class="sell-box">
-      <h3>Mantar Sat</h3>
-      <div class="sell-row">
-        <div>
-          <div style="font-size:0.7rem;color:var(--muted)">Depoda: ${storageUsed().toFixed(1)} kg</div>
-          <div class="big">₺${price.toFixed(0)}/kg</div>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-green" data-action="sell" data-qty="1">1 kg</button>
-          <button class="btn btn-green" data-action="sell" data-qty="5">5 kg</button>
-          <button class="btn btn-green" data-action="sell" data-qty="all">Tümünü Sat</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  tabContent.innerHTML = html;
+/* ===== CHAT ===== */
+.chat-toggle {
+  position:fixed; bottom:calc(18px + env(safe-area-inset-bottom)); right:16px;
+  width:52px; height:52px; border-radius:50%; background:var(--green);
+  border:none; color:#0a0c08; font-size:1.3rem; cursor:pointer; z-index:15;
+  box-shadow:0 4px 18px rgba(106,168,79,0.4); -webkit-tap-highlight-color:transparent;
+  display:flex; align-items:center; justify-content:center; transition:transform 0.15s;
 }
-
-/* ---------- USTALAR ---------- */
-export function renderUstalar() {
-  let html = `<div class="section-head"><h2>Ustalar</h2></div>`;
-
-  const totalSalary = state.masters.reduce((s, m) => s + m.salary, 0);
-  if (totalSalary > 0) {
-    html += `<div class="hint ${state.money < totalSalary ? 'danger' : ''}">
-      Günlük maaş: <b>₺${totalSalary}</b>${state.money < totalSalary ? ' · ⚠️ Bakiye düşük!' : ''}
-    </div>`;
-  } else {
-    html += `<div class="hint">Usta kiralamadın. Ustalar misel ekme ve hasat işlerini otomatikleştirir. Kontamine kompostları da temizler.</div>`;
-  }
-  if (state.masters.length > 0) {
-    html += `<div class="hint">Ustalar kontamine partileri otomatik temizler. Aşılama ustası misel yoksa kendi satın alır.</div>`;
-  }
-
-  html += `<div style="font-family:var(--font-head);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green-bright);margin:14px 0 8px">Usta Davranışı</div>`;
-  html += `
-    <div class="setting-row">
-      <label>Parti Bitince (3. Flaştan Sonra)</label>
-      <select class="setting-select" id="settingRestart">
-        <option value="stop">${RESTART_MODES.stop.name}</option>
-        <option value="ifhave">${RESTART_MODES.ifhave.name}</option>
-        <option value="autobuy">${RESTART_MODES.autobuy.name}</option>
-      </select>
-    </div>
-    <div class="setting-row">
-      <label>Kültivasyon Yöntemi</label>
-      <select class="setting-select" id="settingMethod">
-        <option value="hot">Sıcak Su</option>
-        <option value="lime">Kireç Banyosu</option>
-        <option value="steam">Buhar</option>
-      </select>
-    </div>
-  `;
-
-  html += `<div style="font-family:var(--font-head);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green-bright);margin:14px 0 8px">Kiralanan (${state.masters.length})</div>`;
-  if (state.masters.length === 0) {
-    html += `<div style="font-size:0.72rem;color:var(--muted);padding:8px 0">Henüz usta yok.</div>`;
-  } else {
-    state.masters.forEach(m => {
-      const t = MASTER_TYPES[m.type];
-      const stars = '★'.repeat(m.stars) + '☆'.repeat(5 - m.stars);
-      let effect = m.type === 'inoculate'
-        ? `Kuluçka <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Risk <b>-%${(m.stars-1)*2}</b>`
-        : `Pin+Meyveleme <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Verim <b>+%${(m.stars-1)*3}</b>`;
-      html += `
-        <div class="master-card hired">
-          <div class="master-header">
-            <div class="master-name">${m.name} ${m.surname}</div>
-            <div class="master-stars">${stars}</div>
-          </div>
-          <div class="master-info">
-            <span class="mtype">${t.icon} ${t.name}</span>
-            <span class="msalary">₺${m.salary}/gün</span>
-          </div>
-          <div class="master-effect">${effect}</div>
-          <div class="master-actions">
-            <button class="btn btn-danger" data-action="fireMaster" data-id="${m.id}">Kov</button>
-          </div>
-        </div>
-      `;
-    });
-  }
-
-  const nextRefresh = state.lastMasterRefreshDay + 7 - state.day;
-  html += `<div style="font-family:var(--font-head);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green-bright);margin:18px 0 4px">Kiralık Ustalar</div>`;
-  html += `<div style="font-size:0.66rem;color:var(--muted);margin-bottom:10px">Yenilenmeye <b>${Math.max(0, nextRefresh)} gün</b> (her 7 gün).</div>`;
-
-  state.availableMasters.forEach(m => {
-    const t = MASTER_TYPES[m.type];
-    const stars = '★'.repeat(m.stars) + '☆'.repeat(5 - m.stars);
-    const has = state.masters.some(x => x.type === m.type);
-    let effect = m.type === 'inoculate'
-      ? `Kuluçka <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Risk <b>-%${(m.stars-1)*2}</b>`
-      : `Pin+Meyveleme <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Verim <b>+%${(m.stars-1)*3}</b>`;
-    html += `
-      <div class="master-card">
-        <div class="master-header">
-          <div class="master-name">${m.name} ${m.surname}</div>
-          <div class="master-stars">${stars}</div>
-        </div>
-        <div class="master-info">
-          <span class="mtype">${t.icon} ${t.name}</span>
-          <span class="msalary">₺${m.salary}/gün</span>
-        </div>
-        <div class="master-effect">${effect}</div>
-        <div class="master-actions">
-          ${has
-            ? `<button class="btn btn-ghost" disabled>Bu tip zaten var</button>`
-            : `<button class="btn btn-green" data-action="hireMaster" data-id="${m.id}">Kirala</button>`}
-        </div>
-      </div>
-    `;
-  });
-
-  tabContent.innerHTML = html;
-
-  const rs = document.getElementById('settingRestart');
-  const ms = document.getElementById('settingMethod');
-  if (rs) {
-    rs.value = state.masterRestart || 'stop';
-    rs.addEventListener('change', e => { state.masterRestart = e.target.value; save(); });
-  }
-  if (ms) {
-    ms.value = state.masterMethod || 'hot';
-    ms.addEventListener('change', e => { state.masterMethod = e.target.value; save(); });
-  }
+.chat-toggle:active { transform:scale(0.92); }
+.chat-toggle .badge {
+  position:absolute; top:-2px; right:-2px; min-width:17px; height:17px;
+  border-radius:9px; background:var(--danger); color:#fff; font-size:0.58rem;
+  font-weight:700; display:none; align-items:center; justify-content:center; padding:0 4px;
 }
-
-/* ---------- DEPO ---------- */
-export function renderDepo() {
-  const cap = totalStorageCap();
-  const used = storageUsed();
-  const pct = Math.min(100, (used / cap) * 100);
-  const price = getMushroomSalePrice();
-  let html = `<div class="section-head"><h2>Depo</h2></div>`;
-  html += `
-    <div class="container-card">
-      <h3>Mantar Deposu</h3>
-      <span class="lvl">${used.toFixed(1)} / ${cap} kg</span>
-      <div class="storage-bar"><div class="fill" style="width:${pct}%"></div></div>
-      <div class="sell-row">
-        <div class="big">₺${(used * price).toFixed(0)}</div>
-        <button class="btn btn-green" data-action="sell" data-qty="all" ${used<=0?'disabled':''}>Tümünü Sat</button>
-      </div>
-    </div>
-    <div class="hint">Depo kapasitesi tüm konteynerlerin toplamı. Mantar beklerken bozulmaz.</div>
-  `;
-  tabContent.innerHTML = html;
+.chat-toggle .badge.on { display:flex; }
+.chat-panel {
+  position:fixed; top:0; right:0; bottom:0; width:360px; max-width:100vw;
+  background:var(--surface); border-left:1px solid var(--border); z-index:16;
+  display:flex; flex-direction:column; transform:translateX(100%);
+  transition:transform 0.3s ease; padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
 }
+.chat-panel.open { transform:translateX(0); }
+.chat-head { flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); font-family:var(--font-head); font-size:0.9rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; gap:10px; }
+.chat-head .online { font-family:var(--font-body); font-size:0.58rem; letter-spacing:1px; color:var(--muted); text-transform:none; font-weight:500; white-space:nowrap; }
+.chat-head .online::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--green); margin-right:5px; vertical-align:middle; }
+.chat-head .online.off::before { background:var(--danger); }
+.chat-close { background:transparent; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; padding:0 6px; line-height:1; }
+.chat-messages { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:7px; -webkit-overflow-scrolling:touch; }
+.chat-empty { text-align:center; color:var(--muted); font-size:0.74rem; margin-top:36px; padding:0 18px; }
+.msg { display:flex; flex-direction:column; max-width:85%; }
+.msg.self { align-self:flex-end; align-items:flex-end; }
+.msg .who { font-size:0.58rem; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:var(--muted); margin-bottom:2px; padding:0 4px; }
+.msg.self .who { color:var(--green-bright); }
+.msg .body { background:var(--surface-2); border:1px solid var(--border); padding:6px 10px; border-radius:7px; font-size:0.8rem; line-height:1.4; word-wrap:break-word; overflow-wrap:break-word; }
+.msg.self .body { background:rgba(106,168,79,0.15); border-color:rgba(106,168,79,0.4); }
+.msg .time { font-size:0.52rem; color:var(--muted); margin-top:2px; padding:0 4px; }
+.chat-form { flex-shrink:0; display:flex; gap:6px; padding:8px 10px; border-top:1px solid var(--border); background:var(--surface); }
+.chat-form input { flex:1; padding:9px 11px; background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:var(--font-body); font-size:0.82rem; outline:none; min-width:0; }
+.chat-form input:focus { border-color:var(--green); }
+.chat-form input::placeholder { color:var(--muted); }
+.chat-form input:disabled { opacity:0.5; }
+.chat-form button { padding:9px 14px; background:var(--green); color:#0a0c08; border:none; border-radius:4px; font-family:var(--font-body); font-size:0.7rem; font-weight:600; letter-spacing:1px; text-transform:uppercase; cursor:pointer; }
+.chat-form button:disabled { opacity:0.4; cursor:not-allowed; }
 
-/* ---------- MODAL ---------- */
-export function openNewBatchModal(containerId) {
-  const cont = state.containers.find(c => c.id === containerId);
-  if (!cont) return;
-  if (activeSubstrateIn(cont.id) + BATCH_WEIGHT > CONTAINER_LEVELS[cont.level].capacity) {
-    alert('Bu konteynerde boş slot yok.');
-    return;
-  }
-  const missing = [];
-  if (state.inventory.straw < RECIPE.straw) missing.push(`${RECIPE.straw} kg saman`);
-  if (state.inventory.bran < RECIPE.bran) missing.push(`${RECIPE.bran} kg kepek`);
-  if (state.inventory.gypsum < RECIPE.gypsum) missing.push(`${RECIPE.gypsum} kg alçı`);
-  if (state.inventory.lime < RECIPE.lime) missing.push(`${RECIPE.lime} kg kireç`);
-  if (state.inventory.bag < RECIPE.bag) missing.push(`${RECIPE.bag} poşet`);
-
-  let html = `
-    <h2>Yeni Parti</h2>
-    <span class="sub">Konteyner #${cont.id}</span>
-    <div class="recipe">
-      <b>Reçete:</b> 7 kg saman · 2 kg kepek · 0.5 kg alçı · 0.5 kg kireç · 4 poşet<br>
-      <b>Misel:</b> 0.3 kg (soğutma sonrası)
-    </div>
-  `;
-  if (missing.length) html += `<div class="hint danger">Eksik: <b>${missing.join(', ')}</b></div>`;
-
-  html += `<div style="font-size:0.68rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Pastörizasyon</div>`;
-  Object.entries(METHODS).forEach(([key, m]) => {
-    const disabled = missing.length || state.money < m.cost;
-    html += `
-      <div class="method ${disabled?'disabled':''}" ${disabled?'':'data-action="createBatchIn" data-method="'+key+'" data-container="'+cont.id+'"'}>
-        <div class="m-ico">${m.icon}</div>
-        <div class="m-info">
-          <div class="m-name">${m.name}</div>
-          <div class="m-desc">${m.desc} · ${m.duration}sn${m.cost?' · +₺'+m.cost:''}</div>
-        </div>
-      </div>
-    `;
-  });
-
-  html += `<button class="close" id="modalClose">Kapat</button>`;
-  modalEl.innerHTML = html;
-  modalBack.classList.add('on');
-  modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
-}
-
-export function openBatchModal(id) {
-  const b = state.batches.find(x => x.id === id);
-  if (!b) return;
-  const ph = PHASES[b.phase] || { label: '?' };
-  const risk = currentContamRisk(b);
-  const timeLeft = b.duration && !['cooled','ready','spent','contaminated'].includes(b.phase)
-    ? Math.ceil((100 - b.progress) / 100 * b.duration) + 'sn'
-    : '—';
-
-  let actionHtml = '';
-  if (b.phase === 'cooled') actionHtml = `<button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="inoculateModal" data-id="${b.id}">Misel Ek (0.3 kg)</button>`;
-  else if (b.phase === 'ready') actionHtml = `<button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="harvestModal" data-id="${b.id}">Hasat Et</button>`;
-  else if (b.phase === 'spent') actionHtml = `<button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="manualRestartModal" data-id="${b.id}">Yeniden Başlat</button>`;
-  else if (b.phase === 'contaminated') actionHtml = `<button class="btn btn-danger" style="width:100%;margin-bottom:8px" data-action="removeModal" data-id="${b.id}">Kaldır</button>`;
-
-  modalEl.innerHTML = `
-    <h2>Parti Detayı</h2>
-    <span class="sub">Konteyner #${b.containerId} · Flaş ${b.flush}/3</span>
-    <div class="batch-detail">
-      <div class="bd-row"><span class="k">Aşama</span><span class="v">${ph.label}</span></div>
-      <div class="bd-row"><span class="k">Yöntem</span><span class="v">${METHODS[b.method].name}</span></div>
-      <div class="bd-row"><span class="k">İlerleme</span><span class="v">${Math.round(b.progress||0)}%</span></div>
-      <div class="bd-row"><span class="k">Kalan süre</span><span class="v">${timeLeft}</span></div>
-      <div class="bd-row"><span class="k">Kontaminasyon riski</span><span class="v ${risk>0.1?'danger':'green'}">%${Math.round(risk*100)}</span></div>
-    </div>
-    ${actionHtml}
-    <button class="close" id="modalClose">Kapat</button>
-  `;
-  modalBack.classList.add('on');
-  modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
-}
-
-export function openUpgradeModal(containerId) {
-  const cont = state.containers.find(c => c.id === containerId);
-  if (!cont) return;
-  const curr = CONTAINER_LEVELS[cont.level];
-  const next = CONTAINER_LEVELS[cont.level + 1];
-
-  if (!next) {
-    modalEl.innerHTML = `
-      <h2>Yükselt</h2>
-      <span class="sub">Konteyner #${cont.id}</span>
-      <div class="hint">Bu konteyner maksimum seviyede.</div>
-      <button class="close" id="modalClose">Kapat</button>
-    `;
-    modalBack.classList.add('on');
-    modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
-    return;
-  }
-
-  const canAfford = state.money >= next.cost;
-  const fmtShort = n => '₺' + fmt(n);
-
-  modalEl.innerHTML = `
-    <h2>Yükselt</h2>
-    <span class="sub">Konteyner #${cont.id}</span>
-    <div class="upgrade-compare">
-      <div class="col">
-        <h4>Mevcut · Sv.${cont.level}</h4>
-        <div class="row"><span class="k">Kapasite</span><span class="v">${curr.capacity} kg</span></div>
-        <div class="row"><span class="k">Depo</span><span class="v">${curr.storage} kg</span></div>
-        <div class="row"><span class="k">İklim</span><span class="v">%${Math.round(curr.climate*100)}</span></div>
-        <div class="row"><span class="k">Fiyat</span><span class="v">+%${Math.round(curr.priceBonus*100)}</span></div>
-      </div>
-      <div class="col">
-        <h4>Sonraki · Sv.${cont.level+1}</h4>
-        <div class="row"><span class="k">Kapasite</span><span class="v up">${next.capacity} kg</span></div>
-        <div class="row"><span class="k">Depo</span><span class="v up">${next.storage} kg</span></div>
-        <div class="row"><span class="k">İklim</span><span class="v up">%${Math.round(next.climate*100)}</span></div>
-        <div class="row"><span class="k">Fiyat</span><span class="v up">+%${Math.round(next.priceBonus*100)}</span></div>
-      </div>
-    </div>
-    <div class="upgrade-cost">
-      <div class="lbl">Maliyet</div>
-      <div class="val ${canAfford?'':'poor'}">${fmtShort(next.cost)}</div>
-    </div>
-    <button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="doUpgrade" data-id="${cont.id}" ${canAfford?'':'disabled'}>
-      ${canAfford ? 'Yükselt' : 'Para Yetersiz'}
-    </button>
-    <button class="close" id="modalClose">İptal</button>
-  `;
-  modalBack.classList.add('on');
-  modalEl.querySelector('#modalClose').addEventListener('click', closeModal);
-}
-
-export function closeModal() { modalBack.classList.remove('on'); }
-
-/* ---------- EVENTS ---------- */
-export function setupEvents() {
-  document.getElementById('tabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('.tab');
-    if (!btn) return;
-    activeTab = btn.dataset.tab;
-    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
-    render();
-  });
-
-  tabContent.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const a = btn.dataset.action;
-
-    if (a === 'openContainer') {
-      uretimView = 'container';
-      viewingContainerId = parseInt(btn.dataset.id);
-      renderUretim();
-    }
-    else if (a === 'exitContainer') {
-      uretimView = 'list';
-      viewingContainerId = null;
-      renderUretim();
-    }
-    else if (a === 'openUpgrade') openUpgradeModal(parseInt(btn.dataset.id));
-    else if (a === 'openBatch') openBatchModal(parseFloat(btn.dataset.id));
-    else if (a === 'newBatchIn') openNewBatchModal(parseInt(btn.dataset.container));
-    else if (a === 'buyContainer') buyNewContainer();
-    else if (a === 'skipDay') { for (let i = 0; i < 12; i++) advanceState(); render(); save(); }
-    else if (a === 'sell') sellMushrooms(btn.dataset.qty === 'all' ? 'all' : parseInt(btn.dataset.qty));
-    else if (a === 'remove') removeBatch(parseFloat(btn.dataset.id));
-    else if (a === 'cartAdd') addToCart(btn.dataset.mat, parseInt(btn.dataset.qty));
-    else if (a === 'cartAddCustom') {
-      const mat = btn.dataset.mat;
-      const input = tabContent.querySelector('.qty-input[data-mat="' + mat + '"]');
-      const qty = parseInt(input.value);
-      if (!qty || qty < 1) { alert('Geçerli miktar gir.'); return; }
-      addToCart(mat, qty);
-    }
-    else if (a === 'cartRemove') { delete state.cart[btn.dataset.mat]; save(); renderPazar(); }
-    else if (a === 'cartClear') { state.cart = {}; save(); renderPazar(); }
-    else if (a === 'cartBuy') buyCart();
-    else if (a === 'hireMaster') hireMaster(parseFloat(btn.dataset.id));
-    else if (a === 'fireMaster') fireMaster(parseFloat(btn.dataset.id));
-  });
-
-  tabContent.addEventListener('keydown', (e) => {
-    if (e.target.classList.contains('qty-input') && e.key === 'Enter') {
-      e.preventDefault();
-      const mat = e.target.dataset.mat;
-      const qty = parseInt(e.target.value);
-      if (!qty || qty < 1) return;
-      addToCart(mat, qty);
-    }
-  });
-
-  modalBack.addEventListener('click', (e) => { if (e.target === modalBack) closeModal(); });
-
-  modalEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const a = btn.dataset.action;
-    if (a === 'createBatchIn') createBatch(btn.dataset.method, parseInt(btn.dataset.container));
-    else if (a === 'doUpgrade') { doUpgrade(parseInt(btn.dataset.id)); closeModal(); }
-    else if (a === 'inoculateModal') { if (inoculate(parseFloat(btn.dataset.id), false)) { closeModal(); render(); save(); } }
-    else if (a === 'harvestModal') { if (harvest(parseFloat(btn.dataset.id), false)) { closeModal(); render(); save(); } }
-    else if (a === 'manualRestartModal') { manualRestart(parseFloat(btn.dataset.id)); closeModal(); }
-    else if (a === 'removeModal') { removeBatch(parseFloat(btn.dataset.id)); closeModal(); }
-  });
-
-  document.getElementById('speedGroup').addEventListener('click', (e) => {
-    const btn = e.target.closest('.speed-btn');
-    if (!btn) return;
-    setSpeed(parseInt(btn.dataset.speed));
-  });
-
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    if (!confirm('Tüm ilerleme silinecek. Emin misin?')) return;
-    resetState();
-    uretimView = 'list';
-    viewingContainerId = null;
-    render();
-  });
-}
-
-export function setSpeed(s) {
-  state.speed = s;
-  save();
-  startInterval();
-  renderHUD();
-}
-
-function startInterval() {
-  if (logicInterval) clearInterval(logicInterval);
-  logicInterval = setInterval(() => advanceState(), 1000 / (state.speed || 1));
-}
-
-/* ---------- INIT ---------- */
-export function init() {
-  load();
-  render();
-  setupEvents();
-  startInterval();
-  setInterval(() => renderLive(), 250);
-  setInterval(() => save(), 5000);
-  window.addEventListener('beforeunload', save);
-  initChat();
+@media (max-width:520px) {
+  .stat .val { font-size:0.78rem; }
+  .stat .lbl { font-size:0.46rem; }
+  .tab { font-size:0.58rem; padding:10px 4px; }
+  .speed-btn { font-size:0.56rem; padding:5px 6px; }
+  .chat-panel { width:100vw; }
+  .slot-grid { grid-template-columns:repeat(auto-fill, minmax(78px, 1fr)); gap:6px; }
+  .slot-icon { font-size:1.4rem; }
+  .slot-phase { font-size:0.44rem; }
     }
