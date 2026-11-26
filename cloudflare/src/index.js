@@ -275,9 +275,11 @@ async function handleAdminApi(request, env, pathname) {
     const uid = String(body.uid || "");
     if (!uid || uid === ADMIN_UID) return json({ error: "Oyuncu seçimi geçersiz." }, 400);
     if (body.action === "addMoney") {
-      const save = await dbRequest(`users/${encodeURIComponent(uid)}/gameSave`, env) || {};
-      save.money = Math.max(0, Number(save.money) || 0) + Math.max(0, Math.min(100000000, Number(body.amount) || 0));
-      await dbRequest(`users/${encodeURIComponent(uid)}/gameSave`, env, "PUT", save);
+      const savePath = `users/${encodeURIComponent(uid)}/gameSave`;
+      const save = await dbRequest(savePath, env) || {};
+      const newMoney = Math.max(0, Number(save.money) || 0) + Math.max(0, Math.min(100000000, Number(body.amount) || 0));
+      // Update only the balance so an active player's other save fields are not replaced.
+      await dbRequest(savePath, env, "PATCH", { money: newMoney });
     } else if (body.action === "reset") {
       await dbRequest(`users/${encodeURIComponent(uid)}/gameSave`, env, "PUT", null);
     } else if (body.action === "ban" || body.action === "unban") {
