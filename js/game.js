@@ -32,6 +32,15 @@ const expandedPlots = new Set();   // Üretim'de açık olan arsalar (plaka)
 let selectedPlate = null;          // Arsalar sekmesinde seçili il
 
 const tl = n => '₺' + Math.round(n).toLocaleString('tr-TR');
+const riskPercent = risk => (Math.max(0, risk) * 100).toFixed(2);
+function batchTimeLabel(b) {
+  if (['cooled','ready','spent','contaminated'].includes(b.phase)) {
+    return b.phase === 'ready' ? 'Hasada hazır' : (b.phase === 'cooled' ? 'Misel bekliyor' : '—');
+  }
+  const duration = computeDuration(b);
+  const remaining = Math.max(0, Math.ceil(((100 - (b.progress || 0)) / 100) * duration / (state.speed || 1)));
+  return `${remaining} sn kaldı`;
+}
 
 const tabContent = document.getElementById('tabContent');
 const modalBack = document.getElementById('modalBack');
@@ -172,7 +181,9 @@ export function harvest(id, silent) {
   const cont = state.containers.find(c => c.id === b.containerId);
   const contLevel = CONTAINER_LEVELS[cont ? cont.level : 1];
   const climateMult = climateYieldMult(b.mushroomType, contLevel.climate);
-  const harvMaster = state.masters.find(m => m.type === 'harvest');
+  const harvMaster = state.masters.find(m =>
+    m.type === 'harvest' && Number(m.containerId) === Number(b.containerId)
+  );
   const yieldBonus = harvMaster ? 1 + (harvMaster.stars - 1) * 0.03 : 1;
   const yieldKg = +(base * climateMult * yieldBonus).toFixed(2);
 
@@ -200,12 +211,12 @@ export function harvest(id, silent) {
 }
 
 function handleBatchRestart(b) {
-  if (state.masters.length === 0) return;
+  if (!state.masters.some(m => Number(m.containerId) === Number(b.containerId))) return;
   const mode = state.masterRestart || 'stop';
   if (mode === 'stop') { b.logs.push('Durdur modu: yeni parti yok.'); return; }
   
   if (mode === 'autobuy') {
-    tryBuyForType(b.mushroomType);
+    tryBuyForType(b.mushroomType, b.containerId);
   }
 
   if (!hasMaterialsForType(b.mushroomType)) { b.logs.push('Malzeme yok, yeni parti başlatılamadı.'); return; }
@@ -219,7 +230,7 @@ function handleBatchRestart(b) {
   b.logs.push('🔄 Yeni parti başlatıldı: ' + METHODS[method].name + '.');
 }
 
-function tryBuyForType(type) {
+function tryBuyForType(type, containerId) {
   const recipe = getRecipeForType(type);
   const need = {};
   let missing = false;
@@ -227,7 +238,7 @@ function tryBuyForType(type) {
     const have = state.inventory[mat] || 0;
     if (have < qty) { need[mat] = qty - have; missing = true; }
   }
-  if (state.masters.some(m => m.type === 'inoculate')) {
+  if (state.masters.some(m => m.type === 'inoculate' && Number(m.containerId) === Number(containerId))) {
     const needSpawn = Math.max(0, 0.3 - (state.inventory.spawn || 0));
     if (needSpawn > 0) { need.spawn = needSpawn; missing = true; }
   }
@@ -267,15 +278,17 @@ export function removeBatch(id) {
 }
 
 /* ---------- USTALAR ---------- */
-export function hireMaster(id) {
+export function hireMaster(id, containerId) {
   const idx = state.availableMasters.findIndex(m => m.id === id);
   if (idx === -1) return;
   const master = state.availableMasters[idx];
-  if (state.masters.some(m => m.type === master.type)) {
-    alert(`Zaten bir ${MASTER_TYPES[master.type].name} var.`);
+  const target = state.containers.find(c => Number(c.id) === Number(containerId));
+  if (!target) { alert('Önce bir konteyner seç.'); return; }
+  if (state.masters.some(m => m.type === master.type && Number(m.containerId) === Number(target.id))) {
+    alert(`Konteyner #${target.id} için zaten bir ${MASTER_TYPES[master.type].name} var.`);
     return;
   }
-  state.masters.push(master);
+  state.masters.push({ ...master, containerId: target.id });
   state.availableMasters.splice(idx, 1);
   render(); save();
 }
@@ -290,10 +303,9 @@ export function fireMaster(id) {
 }
 
 export function processMasters() {
-  const inoc = state.masters.find(m => m.type === 'inoculate');
-  const harv = state.masters.find(m => m.type === 'harvest');
-
   state.batches.forEach(b => {
+    const inoc = state.masters.find(m => m.type === 'inoculate' && Number(m.containerId) === Number(b.containerId));
+    const harv = state.masters.find(m => m.type === 'harvest' && Number(m.containerId) === Number(b.containerId));
     if (b.phase === 'cooled' && inoc) {
       if (state.inventory.spawn < 0.3 - 1e-9) {
         const need = 0.3 - state.inventory.spawn;
@@ -311,13 +323,12 @@ export function processMasters() {
     if (b.phase === 'ready' && harv) harvest(b.id, true);
   });
 
-  if (state.masters.length > 0) {
-    for (let i = state.batches.length - 1; i >= 0; i--) {
-      const b = state.batches[i];
-      if (b.phase === 'contaminated' && typeof b.contamTick === 'number'
-          && (state.tickCount - b.contamTick) >= 6) {
-        state.batches.splice(i, 1);
-      }
+  for (let i = state.batches.length - 1; i >= 0; i--) {
+    const b = state.batches[i];
+    const hasStaffHere = state.masters.some(m => Number(m.containerId) === Number(b.containerId));
+    if (hasStaffHere && b.phase === 'contaminated' && typeof b.contamTick === 'number'
+        && (state.tickCount - b.contamTick) >= 6) {
+      state.batches.splice(i, 1);
     }
   }
 }
@@ -379,6 +390,10 @@ export function buyNewContainer(plotId) {
   state.money -= NEW_CONTAINER_COST;
   const newId = Math.max(...state.containers.map(c => c.id), 0) + 1;
   state.containers.push({ id: newId, level: 1, plotId: prov.plate });
+  state.availableMasters.push(
+    generateMaster('inoculate'), generateMaster('inoculate'),
+    generateMaster('harvest'), generateMaster('harvest')
+  );
   expandedPlots.add(prov.plate);
   render(); save();
 }
@@ -457,8 +472,11 @@ function updateLiveContainerView() {
     if (fill) fill.style.width = `${b.progress}%`;
     const phaseText = slotEl.querySelector('.slot-phase');
     if (phaseText && PHASES[b.phase]) {
-      phaseText.textContent = PHASES[b.phase].label;
+      const typeName = MUSHROOM_TYPES[b.mushroomType]?.name || '?';
+      phaseText.innerHTML = `${typeName}<br>${PHASES[b.phase].label}`;
     }
+    const timeEl = slotEl.querySelector('.slot-time');
+    if (timeEl) timeEl.textContent = batchTimeLabel(b);
     const iconEl = slotEl.querySelector('.slot-icon');
     if (iconEl) {
       const newIcon = getPhaseIcon(b);
@@ -591,6 +609,7 @@ function renderContainerView(cont) {
         <div class="slot filled ${isReady?'ready':''} ${isBad?'bad':''}" data-action="openBatch" data-id="${b.id}">
           <div class="slot-icon">${icon}</div>
           <div class="slot-phase">${typeName}<br>${ph.label}</div>
+          <div class="slot-time">${batchTimeLabel(b)}</div>
           <div class="slot-bar"><div class="slot-fill" style="width:${b.progress||0}%"></div></div>
         </div>
       `;
@@ -913,8 +932,8 @@ export function renderUstalar() {
       const t = MASTER_TYPES[m.type];
       const stars = '★'.repeat(m.stars) + '☆'.repeat(5 - m.stars);
       let effect = m.type === 'inoculate'
-        ? `Kuluçka <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Risk <b>-%${(m.stars-1)*2}</b>`
-        : `Pin+Meyveleme <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Verim <b>+%${(m.stars-1)*3}</b>`;
+        ? `Konteyner #${m.containerId} · Kuluçka <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Risk <b>-%${(m.stars-1)*12}</b>`
+        : `Konteyner #${m.containerId} · Pin+Meyveleme <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Verim <b>+%${(m.stars-1)*3}</b>`;
       html += `
         <div class="master-card hired">
           <div class="master-header">
@@ -941,10 +960,13 @@ export function renderUstalar() {
   state.availableMasters.forEach(m => {
     const t = MASTER_TYPES[m.type];
     const stars = '★'.repeat(m.stars) + '☆'.repeat(5 - m.stars);
-    const has = state.masters.some(x => x.type === m.type);
+    const targets = state.containers.filter(c =>
+      !state.masters.some(x => x.type === m.type && Number(x.containerId) === Number(c.id))
+    );
     let effect = m.type === 'inoculate'
-      ? `Kuluçka <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Risk <b>-%${(m.stars-1)*2}</b>`
+      ? `Kuluçka <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Risk <b>-%${(m.stars-1)*12}</b>`
       : `Pin+Meyveleme <b>${STAR_SPEED[m.stars].toFixed(2)}×</b> · Verim <b>+%${(m.stars-1)*3}</b>`;
+    const targetOptions = targets.map(c => `<option value="${c.id}">Konteyner #${c.id}</option>`).join('');
     html += `
       <div class="master-card">
         <div class="master-header">
@@ -957,9 +979,10 @@ export function renderUstalar() {
         </div>
         <div class="master-effect">${effect}</div>
         <div class="master-actions">
-          ${has
-            ? `<button class="btn btn-ghost" disabled>Bu tip zaten var</button>`
-            : `<button class="btn btn-green" data-action="hireMaster" data-id="${m.id}">Kirala</button>`}
+          <select class="setting-select" id="masterTarget-${m.id}" aria-label="Ustanın atanacağı konteyner" ${targets.length ? '' : 'disabled'}>
+            ${targetOptions || '<option value="">Boş usta yeri yok</option>'}
+          </select>
+          <button class="btn btn-green" data-action="hireMaster" data-id="${m.id}" data-target-select="masterTarget-${m.id}" ${targets.length ? '' : 'disabled'}>Kirala</button>
         </div>
       </div>
     `;
@@ -1066,7 +1089,7 @@ export function openNewBatchModal(containerId) {
           <div class="m-ico">${m.icon}</div>
           <div class="m-info">
             <div class="m-name">${m.name}</div>
-            <div class="m-desc">${m.desc} · ${Math.round(m.duration * t.prepMult)}sn${m.cost?' · +₺'+m.cost:''} · Risk %${(estimateContamRisk(selectedType, mKey, cont.id)*100).toFixed(1)}</div>
+            <div class="m-desc">${m.desc} · ${Math.round(m.duration * t.prepMult)}sn${m.cost?' · +₺'+m.cost:''} · Risk %${riskPercent(estimateContamRisk(selectedType, mKey, cont.id))}</div>
           </div>
         </div>
       `;
@@ -1092,9 +1115,7 @@ export function openBatchModal(id) {
   const ph = PHASES[b.phase] || { label: '?' };
   const risk = currentContamRisk(b);
   const typeData = MUSHROOM_TYPES[b.mushroomType];
-  const timeLeft = b.duration && !['cooled','ready','spent','contaminated'].includes(b.phase)
-    ? Math.ceil((100 - b.progress) / 100 * b.duration) + 'sn'
-    : '—';
+  const timeLeft = batchTimeLabel(b);
 
   let actionHtml = '';
   if (b.phase === 'cooled') actionHtml = `<button class="btn btn-green" style="width:100%;margin-bottom:8px" data-action="inoculateModal" data-id="${b.id}">Misel Ek (0.3 kg)</button>`;
@@ -1235,7 +1256,10 @@ export function setupEvents() {
     else if (a === 'cartRemove') { delete state.cart[btn.dataset.mat]; save(); renderPazar(); }
     else if (a === 'cartClear') { state.cart = {}; save(); renderPazar(); }
     else if (a === 'cartBuy') buyCart();
-    else if (a === 'hireMaster') hireMaster(parseFloat(btn.dataset.id));
+    else if (a === 'hireMaster') {
+      const targetSelect = document.getElementById(btn.dataset.targetSelect);
+      hireMaster(parseFloat(btn.dataset.id), targetSelect?.value);
+    }
     else if (a === 'fireMaster') fireMaster(parseFloat(btn.dataset.id));
   });
 
