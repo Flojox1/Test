@@ -1296,8 +1296,8 @@ function startInterval() {
 }
 
 /* ---------- INIT ---------- */
-export function init() {
-  load();
+export async function init(uid) {
+  await load(uid);
   render();
   setupEvents();
   startInterval();
