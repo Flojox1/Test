@@ -68,8 +68,7 @@ export async function initChat() {
     if (!auth.currentUser || !auth.currentUser.emailVerified) throw new Error('Doğrulanmış hesap gerekli.');
     const { getDatabase, ref, push, onChildAdded, query, limitToLast } =
       await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-    const { getDatabase: getDb } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-    const db = getDb(app);
+    const db = getDatabase(app);
     chatStatus.textContent = 'Bağlı';
     chatStatus.classList.remove('off');
     chatInput.disabled = false;
