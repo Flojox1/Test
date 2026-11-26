@@ -23,9 +23,9 @@ Realtime Database → Rules bölümüne aşağıdaki kuralları yapıştırıp P
 {
   "rules": {
     "chat": {
-      ".read": "auth != null",
+      ".read": "auth != null && auth.token.email_verified == true",
       "$messageId": {
-        ".write": "auth != null && !data.exists()",
+        ".write": "auth != null && auth.token.email_verified == true && !data.exists()",
         ".validate": "newData.hasChildren(['name', 'text', 'ts']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 20 && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 200 && newData.child('ts').isNumber()"
       }
     }
