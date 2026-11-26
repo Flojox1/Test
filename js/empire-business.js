@@ -1,4 +1,4 @@
-import { state, save, render } from './core.js';
+import { state, save } from './core.js';
 import { render as renderGame } from './game.js';
 
 const CATALOG = [
