@@ -34,11 +34,12 @@ chatClose.addEventListener('click', () => {
   chatOpen = false; chatPanel.classList.remove('open'); refreshBadge();
 });
 
-function addMessage(msg, isSelf) {
+function addMessage(msg, isSelf, messageId) {
   const empty = chatMessages.querySelector('.chat-empty');
   if (empty) empty.remove();
   const div = document.createElement('div');
   div.className = 'msg' + (isSelf ? ' self' : '');
+  if (messageId) div.dataset.messageId = messageId;
   const who = document.createElement('span');
   who.className = 'who';
   who.textContent = isSelf ? 'Sen' : (msg.name || 'Anonim');
@@ -66,7 +67,7 @@ export async function initChat() {
     const app = await getFirebaseApp();
     const auth = await getFirebaseAuth();
     if (!auth.currentUser || !auth.currentUser.emailVerified) throw new Error('Doğrulanmış hesap gerekli.');
-    const { getDatabase, ref, push, onChildAdded, query, limitToLast, get, onValue } =
+    const { getDatabase, ref, push, onChildAdded, onChildRemoved, query, limitToLast, get, onValue } =
       await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
     const db = getDatabase(app);
     const profile = await get(ref(db, `users/${auth.currentUser.uid}/profile`));
@@ -87,7 +88,14 @@ export async function initChat() {
     onChildAdded(chatRef, (snap) => {
       const msg = snap.val();
       if (!msg) return;
-      addMessage(msg, msg.name === myName);
+      addMessage(msg, msg.name === myName, snap.key);
+    });
+    onChildRemoved(chatRef, snap => {
+      const removed = chatMessages.querySelector(`[data-message-id="${snap.key}"]`);
+      if (removed) removed.remove();
+      if (!chatMessages.querySelector('.msg')) {
+        const empty = document.createElement('div'); empty.className = 'chat-empty'; empty.textContent = 'Henüz mesaj yok. İlk konuşan sen ol.'; chatMessages.appendChild(empty);
+      }
     });
     setTimeout(() => { firstLoad = false; }, 1500);
     chatForm.addEventListener('submit', async (e) => {
