@@ -281,6 +281,14 @@ body {
   text-align: center;
   margin-bottom: 4px;
 }
+.slot-time {
+  color: var(--gold);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 1px 3px #000;
+  margin: 2px 0 5px;
+}
 
 .slot-bar {
   height: 5px; 
