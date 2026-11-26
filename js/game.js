@@ -24,6 +24,7 @@ import { getProvince, plotPrice } from './plots.js';
 
 import { initChat } from './chat.js';
 import { getFirebaseApp } from './firebase.js';
+import { createCharacter } from './empire.js';
 
 let activeTab = 'uretim';
 let logicInterval = null;
@@ -800,6 +801,20 @@ export function renderPazar() {
     Sonraki: <b>${next} gün</b>
   </div>`;
 
+  // Büyük simülasyona geçiş için tek seferlik özel fırsat.
+  const empireOfferPrice = 2500000;
+  if (!state.empire?.transitionOffer?.purchased && (state.empire?.transitionOffer?.available || state.money >= empireOfferPrice)) {
+    html += `
+      <div class="container-card" style="border:1px solid var(--green-bright);margin:14px 0;padding:16px">
+        <div style="font-size:0.68rem;letter-spacing:1px;color:var(--green-bright);font-weight:800">🎟️ ÖZEL FIRSAT</div>
+        <h3 style="margin:8px 0">Hayatını Değiştirecek Fırsat</h3>
+        <p style="color:var(--muted);font-size:0.82rem;line-height:1.5">Ayrıntılar satın alma sonrasında açıklanacaktır. Bu fırsat seni çok daha büyük bir simülasyon dünyasına taşıyacak.</p>
+        <div class="cart-total"><span>Fırsat bedeli</span><span class="big">₺2.500.000</span></div>
+        <button class="btn btn-green" data-action="buyEmpireOffer" style="width:100%;margin-top:10px" ${state.money < empireOfferPrice ? 'disabled' : ''}>${state.money < empireOfferPrice ? 'Para Yetersiz' : 'Fırsatı Satın Al'}</button>
+      </div>
+    `;
+  }
+
   // Türe göre güncel mantar fiyatları
   html += `<div class="container-card"><h3>Mantar Fiyatları</h3><span class="lvl">Güncel talep</span>`;
   Object.entries(MUSHROOM_TYPES).forEach(([key, t]) => {
@@ -1257,6 +1272,22 @@ export function setupEvents() {
     else if (a === 'cartRemove') { delete state.cart[btn.dataset.mat]; save(); renderPazar(); }
     else if (a === 'cartClear') { state.cart = {}; save(); renderPazar(); }
     else if (a === 'cartBuy') buyCart();
+    else if (a === 'buyEmpireOffer') {
+      const offerPrice = 2500000;
+      if (state.empire?.transitionOffer?.purchased) { alert('Bu özel fırsatı zaten satın aldın.'); return; }
+      if (state.money < offerPrice) { alert('Bu fırsat için ₺2.500.000 gerekiyor.'); return; }
+      if (!confirm('₺2.500.000 karşılığında özel fırsatı satın almak ve yeni simülasyon dönemini başlatmak istiyor musun?')) return;
+      state.money -= offerPrice;
+      state.empire = state.empire || {};
+      state.empire.unlocked = true;
+      state.empire.transitionOffer = { available: true, purchased: true, price: offerPrice, purchasedAt: Date.now() };
+      state.empire.history = state.empire.history || { generation: 0, previousCharacters: [] };
+      state.empire.history.generation = 1;
+      state.empire.character = createCharacter({ generation: 1 });
+      save();
+      render();
+      alert('Özel fırsat satın alındı! Yeni simülasyon dünyasının kilidi açıldı. Şehir ve mahalle seçimi bir sonraki geliştirme aşamasında hazırlanacak.');
+    }
     else if (a === 'hireMaster') {
       const targetSelect = document.getElementById(btn.dataset.targetSelect);
       hireMaster(parseFloat(btn.dataset.id), targetSelect?.value);
