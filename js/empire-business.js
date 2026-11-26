@@ -1,5 +1,5 @@
 import { state, save } from './core.js';
-import { render as renderGame } from './game.js';
+import { render as renderGame, advanceState } from './game.js';
 
 const CATALOG = [
   { id: 'market', name: 'Market', icon: '🛒', price: 850000, income: 18500, upkeep: 4200, capacity: 1.00 },
@@ -25,7 +25,7 @@ function ensureEconomy() {
   const empire = state.empire;
   if (!empire.economy || typeof empire.economy !== 'object') {
     empire.economy = {
-      day: 1, dirtyBalance: 0, suspicion: 0, audits: 0,
+      day: state.day || 1, dirtyBalance: 0, suspicion: 0, audits: 0,
       lastAuditDay: 0, frozenUntil: 0, log: [],
       businesses: []
     };
@@ -36,7 +36,7 @@ function ensureEconomy() {
   ['day','dirtyBalance','suspicion','audits','lastAuditDay','frozenUntil'].forEach(k => {
     if (!Number.isFinite(Number(e[k]))) e[k] = 0;
   });
-  if (!e.day) e.day = 1;
+  if (!e.day) e.day = state.day || 1;
   return e;
 }
 
@@ -68,7 +68,8 @@ function buyBusiness(id) {
 
 function advanceEmpireDay() {
   const e = ensureEconomy();
-  e.day += 1;
+  for (let tick = 0; tick < 12; tick++) advanceState();
+  e.day = state.day;
   let net = 0;
   for (const business of e.businesses) {
     if (business.frozen && e.day > e.frozenUntil) business.frozen = false;
