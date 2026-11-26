@@ -87,3 +87,18 @@ export async function requireVerifiedUser() {
     }, reject);
   });
 }
+
+
+export async function changeAccountPassword(currentPassword, newPassword) {
+  const auth = await getFirebaseAuth();
+  const user = auth.currentUser;
+  if (!user || !user.email) throw new Error('Oturum bulunamadı. Tekrar giriş yap.');
+  const {
+    EmailAuthProvider,
+    reauthenticateWithCredential,
+    updatePassword
+  } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  await updatePassword(user, newPassword);
+}
