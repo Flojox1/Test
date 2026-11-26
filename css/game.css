@@ -768,3 +768,30 @@ body.empire-mode .chat-panel,body.empire-mode .chat-toggle { display:none!import
   .empire-map-card,.empire-location-card { padding:12px; }
   .empire-stats-grid,.empire-needs-grid { gap:10px; }
 }
+
+
+/* Profil - şifre değiştirme */
+.password-change-form {
+  display:grid; gap:7px; margin-top:20px; padding-top:16px;
+  border-top:1px solid var(--border); text-align:left;
+}
+.password-change-form h3 {
+  color:var(--green-bright); font:700 .72rem var(--font-head);
+  letter-spacing:1.2px; margin-bottom:4px;
+}
+.password-change-form label {
+  color:var(--muted); font-size:.58rem; letter-spacing:1px;
+  text-transform:uppercase; margin-top:4px;
+}
+.password-change-form input {
+  width:100%; min-width:0; padding:11px 12px; border-radius:8px;
+  border:1px solid var(--border); background:var(--bg); color:var(--text);
+  font:.82rem var(--font-body); outline:none;
+}
+.password-change-form input:focus { border-color:var(--green); }
+.password-change-status {
+  min-height:18px; color:var(--green-bright); font-size:.68rem;
+  line-height:1.45; overflow-wrap:anywhere;
+}
+.password-change-status.error { color:#ff8989; }
+.password-change-form button:disabled { opacity:.55; }
