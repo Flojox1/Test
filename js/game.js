@@ -51,8 +51,10 @@ async function ensureEmpireDistricts() {
     const response = await fetch(`https://api.turkiyeapi.dev/v2/provinces/${cityId}/districts?fields=id,name&sort=name&limit=1000`);
     if (!response.ok) throw new Error('İlçe listesi alınamadı.');
     const result = await response.json();
-    empireDistricts = Array.isArray(result.data) ? result.data : [];
-    empireDistrictsFor = cityId;
+    if (Number(state.empire?.world?.cityId) === cityId) {
+      empireDistricts = Array.isArray(result.data) ? result.data : [];
+      empireDistrictsFor = cityId;
+    }
   } catch (error) {
     empireLocationError = 'İlçe listesi yüklenemedi. İnternet bağlantını kontrol edip tekrar dene.';
     console.warn('Empire ilçe listesi yüklenemedi:', error);
@@ -71,8 +73,10 @@ async function ensureEmpireNeighborhoods() {
     const response = await fetch(`https://api.turkiyeapi.dev/v2/districts/${districtId}/neighborhoods?fields=id,name&sort=name&limit=1000`);
     if (!response.ok) throw new Error('Mahalle listesi alınamadı.');
     const result = await response.json();
-    empireNeighborhoods = Array.isArray(result.data) ? result.data : [];
-    empireNeighborhoodsFor = districtId;
+    if (Number(state.empire?.world?.districtId) === districtId) {
+      empireNeighborhoods = Array.isArray(result.data) ? result.data : [];
+      empireNeighborhoodsFor = districtId;
+    }
   } catch (error) {
     empireLocationError = 'Mahalle listesi yüklenemedi. İnternet bağlantını kontrol edip tekrar dene.';
     console.warn('Empire mahalle listesi yüklenemedi:', error);
@@ -175,9 +179,9 @@ function renderEmpireSetup() {
   });
 
   // Seçim ekranı yarıda kapatılıp yeniden açılırsa kayıtlı konumun listelerini geri yükle.
-  if (world.cityId && !empireDistrictsFor && !empireLocationLoading && !empireLocationError) {
+  if (world.cityId && empireDistrictsFor !== Number(world.cityId) && !empireLocationLoading && !empireLocationError) {
     ensureEmpireDistricts();
-  } else if (world.districtId && !empireNeighborhoodsFor && !empireLocationLoading && !empireLocationError) {
+  } else if (world.districtId && empireNeighborhoodsFor !== Number(world.districtId) && !empireLocationLoading && !empireLocationError) {
     ensureEmpireNeighborhoods();
   }
 }
