@@ -24,12 +24,12 @@ async function callWorker(path, data = {}) {
 
 export async function registerWithEmail(email, password) {
   const app = await getFirebaseApp();
-  const { getAuth, createUserWithEmailAndPassword } =
+  const { getAuth, createUserWithEmailAndPassword, signOut } =
     await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
   const auth = getAuth(app);
   const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
   try { await callWorker('send-code'); }
-  catch (error) { await auth.signOut(); throw error; }
+  catch (error) { await signOut(auth); throw error; }
   return credential.user;
 }
 
