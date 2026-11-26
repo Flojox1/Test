@@ -12,7 +12,7 @@ const chatStatus = document.getElementById('chatStatus');
 const chatBadge = document.getElementById('chatBadge');
 
 let chatOpen = false, unread = 0;
-let myName = localStorage.getItem('florod_name') || '';
+let myName = '';
 let firstLoad = true;
 
 function refreshBadge() {
@@ -66,9 +66,19 @@ export async function initChat() {
     const app = await getFirebaseApp();
     const auth = await getFirebaseAuth();
     if (!auth.currentUser || !auth.currentUser.emailVerified) throw new Error('Doğrulanmış hesap gerekli.');
-    const { getDatabase, ref, push, onChildAdded, query, limitToLast } =
+    const { getDatabase, ref, push, onChildAdded, query, limitToLast, get, onValue } =
       await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
     const db = getDatabase(app);
+    const profile = await get(ref(db, `users/${auth.currentUser.uid}/profile`));
+    myName = profile.val()?.name || 'Oyuncu';
+    onValue(ref(db, 'settings/chatEnabled'), snap => {
+      const enabled = !snap.exists() || snap.val() !== false;
+      chatInput.disabled = !enabled;
+      chatSend.disabled = !enabled;
+      chatInput.placeholder = enabled ? 'Mesaj yaz...' : 'Sohbet yönetici tarafından kapatıldı';
+      chatStatus.textContent = enabled ? 'Bağlı' : 'Sohbet kapalı';
+      chatStatus.classList.toggle('off', !enabled);
+    });
     chatStatus.textContent = 'Bağlı';
     chatStatus.classList.remove('off');
     chatInput.disabled = false;
@@ -84,12 +94,7 @@ export async function initChat() {
       e.preventDefault();
       const text = chatInput.value.trim();
       if (!text) return;
-      if (!myName) {
-        const entered = prompt('Sohbette görünecek adın:');
-        if (!entered || !entered.trim()) return;
-        myName = entered.trim().slice(0,20);
-        localStorage.setItem('florod_name', myName);
-      }
+      if (!myName) { alert('Oyuncu adın bulunamadı. Sayfayı yenile.'); return; }
       chatInput.value = '';
       try { await push(ref(db, 'chat'), { name: myName, text: text.slice(0,200), ts: Date.now() }); }
       catch (err) { alert('Mesaj gönderilemedi: ' + err.message); }
