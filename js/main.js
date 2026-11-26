@@ -2,31 +2,57 @@ import { requireVerifiedUser } from './auth.js';
 import { init } from './game.js';
 import { getFirebaseApp } from './firebase.js';
 
+function choosePlayerName() {
+  const back = document.getElementById('nameSetupBack');
+  const form = document.getElementById('nameSetupForm');
+  const input = document.getElementById('playerNameInput');
+  const error = document.getElementById('nameSetupError');
+  const submit = document.getElementById('nameSetupSubmit');
+
+  back.classList.add('open');
+  back.setAttribute('aria-hidden', 'false');
+  input.focus();
+
+  return new Promise(resolve => {
+    const onSubmit = event => {
+      event.preventDefault();
+      const name = input.value.trim().replace(/\\s+/g, ' ');
+      if (name.length < 2 || name.length > 20) {
+        error.textContent = 'Kullanıcı adı 2-20 karakter arasında olmalı.';
+        return;
+      }
+      form.removeEventListener('submit', onSubmit);
+      submit.disabled = true;
+      resolve(name);
+    };
+    form.addEventListener('submit', onSubmit);
+  });
+}
+
 try {
   const user = await requireVerifiedUser();
   if (!user) {
     window.location.replace('index.html');
   } else {
-    document.documentElement.dataset.accountEmail = user.email || '';
     const app = await getFirebaseApp();
     const { getDatabase, ref, get, set } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js');
     const db = getDatabase(app);
     const profileRef = ref(db, `users/${user.uid}/profile`);
     const profileSnap = await get(profileRef);
-    if (!profileSnap.exists() || !profileSnap.val()?.name) {
-      let playerName = '';
-      while (!playerName) {
-        const entered = prompt('Oyuna hoş geldin! Kullanacağın oyuncu adını seç (2-20 karakter):');
-        if (entered === null) { await (await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js')).signOut(await (await import('./firebase.js')).getFirebaseAuth()); window.location.replace('index.html'); throw new Error('İsim seçimi iptal edildi.'); }
-        const cleaned = entered.trim().replace(/\s+/g, ' ').slice(0, 20);
-        if (cleaned.length >= 2) playerName = cleaned;
-        else alert('İsim en az 2 karakter olmalı.');
-      }
+    let profile = profileSnap.exists() ? profileSnap.val() : {};
+
+    if (!profile?.name || typeof profile.name !== 'string' || !profile.name.trim()) {
+      const playerName = await choosePlayerName();
       await set(profileRef, { name: playerName, createdAt: Date.now() });
+      profile = { ...profile, name: playerName };
+      const setupBack = document.getElementById('nameSetupBack');
+      setupBack.classList.remove('open');
+      setupBack.setAttribute('aria-hidden', 'true');
     }
-    const currentProfile = (await get(profileRef)).val() || {};
-    document.getElementById('profileName').textContent = currentProfile.name || 'Oyuncu';
+
+    document.getElementById('profileName').textContent = profile.name.trim();
     document.getElementById('profileEmail').textContent = user.email || 'E-posta bulunamadı';
+
     const profileBack = document.getElementById('profileBack');
     const closeProfile = () => {
       profileBack.classList.remove('open');
@@ -43,20 +69,17 @@ try {
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape') closeProfile();
     });
+
     await init(user.uid);
   }
 } catch (error) {
-  if (error?.message === 'İsim seçimi iptal edildi.') { window.location.replace('index.html'); }
-  else {
   console.error('Oyun başlatılamadı:', error);
-  // Giriş sayfasına geri atmak yerine gerçek hatayı göster ki kayıt korunarak düzeltilebilsin.
   document.body.innerHTML = `
     <main style="max-width:600px;margin:12vh auto;padding:24px;color:#f5f0df;font-family:Arial,sans-serif;background:#171b14;border:1px solid #586044;border-radius:14px">
       <h2>Oyun açılamadı</h2>
-      <p>Hesabın açık, ancak oyun/kayıt yüklenirken bir hata oluştu.</p>
+      <p>Hesabın açık, ancak profil veya oyun kaydı yüklenirken bir hata oluştu.</p>
       <pre style="white-space:pre-wrap;overflow-wrap:anywhere;color:#ffd28a">${String(error?.message || error)}</pre>
       <button onclick="location.reload()" style="padding:12px 18px;border:0;border-radius:8px">Tekrar dene</button>
       <p style="font-size:13px;color:#aaa">Mevcut bulut kaydına dokunulmadı.</p>
     </main>`;
-  }
 }
