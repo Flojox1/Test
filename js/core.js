@@ -240,29 +240,15 @@ export function resetState() {
 
 /* ---------- PİYASA ---------- */
 export function refreshMarket() {
-  // Kâr marjı (istiridye referansı): 10–400 ₺/flaş, ortaya yakın dağılım
-  const profitNorm = (Math.random() + Math.random()) / 2;
-  const profitPerFlush = 10 + profitNorm * 390;
-
-  // Malzeme katsayısı: 0.8–1.2
+  // Mantar satış fiyatları sabittir; yalnızca malzeme piyasası değişebilir.
   const materialMult = 0.8 + Math.random() * 0.4;
-
-  // İstiridye referans fiyatı (kâr garantili):
-  // profitPerFlush = BATCH_YIELD_AVG × fiyat − (BASE_RECIPE_COST × materialMult) / flaşSayısı
-  const flushCount = MUSHROOM_TYPES.oyster.flushYield.length;
-  const costPerFlush = (BASE_RECIPE_COST * materialMult) / flushCount;
-  const mushroomPrice = (profitPerFlush + costPerFlush) / BATCH_YIELD_AVG;
-
-  // Türe özel talep: her tür için ±%15
   const demand = {};
-  Object.keys(MUSHROOM_TYPES).forEach(k => {
-    demand[k] = +(0.85 + Math.random() * 0.30).toFixed(2);
-  });
+  Object.keys(MUSHROOM_TYPES).forEach(k => { demand[k] = 1; });
 
   state.market = {
-    profitPerFlush: Math.round(profitPerFlush),
+    profitPerFlush: 330,
     materialMult: +materialMult.toFixed(3),
-    mushroomPrice: +mushroomPrice.toFixed(2),
+    mushroomPrice: 165,
     demand
   };
 }
@@ -282,8 +268,9 @@ function containerPriceBonus() {
 // Bir türün (konteyner bonusu hariç) kg fiyatı
 export function getTypeBasePrice(type) {
   const t = MUSHROOM_TYPES[type] || MUSHROOM_TYPES.oyster;
-  const demand = state.market?.demand?.[type] ?? 1;
-  return getMushroomBasePrice() * t.priceMult * demand;
+  // Türün kilogram satış fiyatı sabittir; iklim seviyesi yükseldikçe
+  // yetiştirilen türlerin birim değeri de belirgin biçimde artar.
+  return Number(t.fixedPrice) || getMushroomBasePrice() * t.priceMult;
 }
 
 // Bir türün satış fiyatı (konteyner bonusu dahil)
