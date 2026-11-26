@@ -5,7 +5,7 @@
 // =====================================================================
 import { PROVINCES } from './provinces.js';
 
-export const START_PLOT = 68;           // Aksaray — herkes burada başlar
+export const START_PLOT = 0;            // Şehirden bağımsız ücretsiz mantar üretim alanı
 
 const BASE_PRICE   = 15000;             // her arsanın taban fiyatı
 const PER_1000_POP = 20;                // her 1.000 kişi için ek fiyat
