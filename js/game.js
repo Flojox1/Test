@@ -34,12 +34,18 @@ let selectedPlate = null;          // Arsalar sekmesinde seçili il
 const tl = n => '₺' + Math.round(n).toLocaleString('tr-TR');
 const riskPercent = risk => (Math.max(0, risk) * 100).toFixed(2);
 function batchTimeLabel(b) {
-  if (['cooled','ready','spent','contaminated'].includes(b.phase)) {
-    return b.phase === 'ready' ? 'Hasada hazır' : (b.phase === 'cooled' ? 'Misel bekliyor' : '—');
-  }
+  if (b.phase === 'ready') return 'HASADA HAZIR';
+  if (b.phase === 'cooled') return 'MİSEL BEKLİYOR';
+  if (['spent','contaminated'].includes(b.phase)) return '—';
+
   const duration = computeDuration(b);
-  const remaining = Math.max(0, Math.ceil(((100 - (b.progress || 0)) / 100) * duration / (state.speed || 1)));
-  return `${remaining} sn kaldı`;
+  // Oyun hızı tick aralığını değiştirir; gerçek kalan süreyi değiştirmez.
+  const seconds = Math.max(0, Math.ceil(((100 - (b.progress || 0)) / 100) * duration));
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return minutes > 0
+    ? `KALAN ${minutes}:${String(remainder).padStart(2, '0')}`
+    : `KALAN 0:${String(remainder).padStart(2, '0')}`;
 }
 
 const tabContent = document.getElementById('tabContent');
