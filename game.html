@@ -48,7 +48,19 @@
     <h2 id="profileTitle">Oyuncu Profili</h2>
     <div class="profile-name" id="profileName">Yükleniyor...</div>
     <div class="profile-email-label">GMAIL</div>
-    <div class="profile-email" id="profileEmail">Yükleniyor...</div>\n    <button id="playerLogout" type="button" class="btn btn-ghost" style="width:100%;margin-top:18px">Çıkış yap</button>
+    <div class="profile-email" id="profileEmail">Yükleniyor...</div>
+    <form id="changePasswordForm" class="password-change-form">
+      <h3>Şifre Değiştir</h3>
+      <label for="currentAccountPassword">Mevcut şifre</label>
+      <input id="currentAccountPassword" type="password" autocomplete="current-password" minlength="6" required />
+      <label for="newAccountPassword">Yeni şifre</label>
+      <input id="newAccountPassword" type="password" autocomplete="new-password" minlength="6" required />
+      <label for="confirmAccountPassword">Yeni şifre tekrar</label>
+      <input id="confirmAccountPassword" type="password" autocomplete="new-password" minlength="6" required />
+      <button id="changePasswordSubmit" type="submit" class="btn btn-green" style="width:100%;margin-top:10px">ŞİFREYİ GÜNCELLE</button>
+      <p id="changePasswordStatus" class="password-change-status" role="status" aria-live="polite"></p>
+    </form>
+    <button id="playerLogout" type="button" class="btn btn-ghost" style="width:100%;margin-top:10px">Çıkış yap</button>
   </section>
 </div>
 <div class="profile-back" id="nameSetupBack" aria-hidden="true">
