@@ -36,7 +36,12 @@ export async function registerWithEmail(email, password) {
 export async function verifyEmailCode(code) {
   const result = await callWorker('verify-code', { code: String(code).trim() });
   const auth = await getFirebaseAuth();
-  if (auth.currentUser) await auth.currentUser.reload();
+  if (auth.currentUser) {
+    // Worker emailVerified bilgisini sunucuda güncelledi. Önce kullanıcı
+    // kaydını, ardından RTDB kurallarının kullandığı ID token'ı yenile.
+    await auth.currentUser.reload();
+    await auth.currentUser.getIdToken(true);
+  }
   return result;
 }
 
