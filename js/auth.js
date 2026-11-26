@@ -1,24 +1,25 @@
 import { getFirebaseApp, getFirebaseAuth } from './firebase.js';
 
-const FUNCTIONS_URL = 'https://europe-west1-chat-f3082.cloudfunctions.net';
+// Cloudflare Worker deploy edildikten sonra workers.dev adresini buraya yaz.
+const AUTH_WORKER_URL = 'https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
 
-async function callFunction(name, data = {}) {
+async function callWorker(path, data = {}) {
   const auth = await getFirebaseAuth();
   const user = auth.currentUser;
   if (!user) throw new Error('Oturum bulunamadı. Tekrar giriş yap.');
   const token = await user.getIdToken(true);
-  const response = await fetch(`${FUNCTIONS_URL}/${name}`, {
+  const response = await fetch(`${AUTH_WORKER_URL}/${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ data })
+    body: JSON.stringify(data)
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.error) {
-    const error = new Error(payload.error?.message || 'İşlem tamamlanamadı.');
-    error.code = payload.error?.status || 'functions/internal';
+    const error = new Error(payload.error || 'İşlem tamamlanamadı.');
+    error.code = `worker/${response.status}`;
     throw error;
   }
-  return payload.result;
+  return payload;
 }
 
 export async function registerWithEmail(email, password) {
@@ -27,20 +28,20 @@ export async function registerWithEmail(email, password) {
     await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
   const auth = getAuth(app);
   const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-  try { await callFunction('sendVerificationCode'); }
+  try { await callWorker('send-code'); }
   catch (error) { await auth.signOut(); throw error; }
   return credential.user;
 }
 
 export async function verifyEmailCode(code) {
-  const result = await callFunction('verifyEmailCode', { code: String(code).trim() });
+  const result = await callWorker('verify-code', { code: String(code).trim() });
   const auth = await getFirebaseAuth();
   if (auth.currentUser) await auth.currentUser.reload();
   return result;
 }
 
 export async function resendVerificationCode() {
-  return callFunction('sendVerificationCode');
+  return callWorker('send-code');
 }
 
 export async function loginWithEmail(email, password) {
