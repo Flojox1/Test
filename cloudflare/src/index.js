@@ -316,8 +316,8 @@ async function handleAdminApi(request, env, pathname) {
         "Vary": "Origin"
       }
     });
-    if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
     const url = new URL(request.url);
+    if (request.method !== "POST" && !(request.method === "GET" && url.pathname.startsWith("/admin/"))) return json({ error: "Method not allowed" }, 405, origin);
     try {
       let response;
       if (url.pathname === "/admin-login") response = await handleAdminLogin(request, env);\n      else if (url.pathname.startsWith("/admin/")) response = await handleAdminApi(request, env, url.pathname);\n      else if (url.pathname === "/send-code") response = await handleSendCode(request, env);
