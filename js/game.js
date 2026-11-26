@@ -793,7 +793,7 @@ export function renderArsalar() {
 
   tabContent.innerHTML = `
     <div class="section-head"><h2>Arsalar · Türkiye</h2></div>
-    <div class="hint">Bir ile dokun: arsa fiyatını ve kaç konteyner açabileceğini gör. Bir arsada <b>ilçe sayısı kadar</b> konteyner açılır. Başlangıç arsan <b>Aksaray</b>.</div>
+    <div class="hint">Bir ile dokun: arsa fiyatını ve kaç konteyner açabileceğini gör. Bir arsada <b>ilçe sayısı kadar</b> konteyner açılır. Başlangıçta şehir arsası bulunmaz.</div>
     <div class="arsa-wrap ${sel ? 'has-sel' : ''}">
       <div class="map-box">
         <div class="map-tools">
