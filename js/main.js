@@ -27,6 +27,8 @@ try {
     await init(user.uid);
   }
 } catch (error) {
+  if (error?.message === 'İsim seçimi iptal edildi.') { window.location.replace('index.html'); }
+  else {
   console.error('Oyun başlatılamadı:', error);
   // Giriş sayfasına geri atmak yerine gerçek hatayı göster ki kayıt korunarak düzeltilebilsin.
   document.body.innerHTML = `
@@ -37,4 +39,5 @@ try {
       <button onclick="location.reload()" style="padding:12px 18px;border:0;border-radius:8px">Tekrar dene</button>
       <p style="font-size:13px;color:#aaa">Mevcut bulut kaydına dokunulmadı.</p>
     </main>`;
+  }
 }
