@@ -63,9 +63,12 @@ export async function initChat() {
   }
   try {
     const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+    const { getAuth, signInAnonymously } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
     const { getDatabase, ref, push, onChildAdded, query, limitToLast } =
       await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
     const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    await signInAnonymously(auth);
     const db = getDatabase(app);
     chatStatus.textContent = 'Bağlı';
     chatStatus.classList.remove('off');
