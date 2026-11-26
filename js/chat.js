@@ -1,4 +1,5 @@
-import { firebaseConfig, chatEnabled } from './config.js';
+import { chatEnabled } from './config.js';
+import { getFirebaseAuth, getFirebaseApp } from './firebase.js';
 
 const chatToggle = document.getElementById('chatToggle');
 const chatPanel = document.getElementById('chatPanel');
@@ -62,14 +63,13 @@ export async function initChat() {
     return;
   }
   try {
-    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
-    const { getAuth, signInAnonymously } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+    const app = await getFirebaseApp();
+    const auth = await getFirebaseAuth();
+    if (!auth.currentUser || !auth.currentUser.emailVerified) throw new Error('Doğrulanmış hesap gerekli.');
     const { getDatabase, ref, push, onChildAdded, query, limitToLast } =
       await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    await signInAnonymously(auth);
-    const db = getDatabase(app);
+    const { getDatabase: getDb } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+    const db = getDb(app);
     chatStatus.textContent = 'Bağlı';
     chatStatus.classList.remove('off');
     chatInput.disabled = false;
