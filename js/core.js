@@ -151,6 +151,15 @@ function normalizeState() {
     }
   });
   if (!Array.isArray(state.availableMasters)) state.availableMasters = [];
+  // Her konteyner için her uzmanlıkta yeterli kiralık aday bulunsun.
+  const candidatesNeeded = Math.max(1, state.containers.length) * 2;
+  for (const type of ['inoculate', 'harvest']) {
+    let count = state.availableMasters.filter(m => m.type === type).length;
+    while (count < candidatesNeeded) {
+      state.availableMasters.push(generateMaster(type));
+      count++;
+    }
+  }
   if (!state.masterRestart) state.masterRestart = 'stop';
   if (!state.masterMethod) state.masterMethod = 'hot';
   if (!state.speed) state.speed = 1;
@@ -437,7 +446,7 @@ export function contamRiskFor(typeKey, method, level, containerId) {
   );
   // Usta yıldız başına kontaminasyon riskini %12 azaltır.
   if (master) risk *= 1 - (master.stars - 1) * 0.12;
-  // Gerçek olasılığı üç basamakta sakla; ekranda yuvarlayıp sahte %0 göstermeyelim.
+  // Gerçek olasılığı dört basamakta sakla; ekranda yuvarlayıp sahte %0 göstermeyelim.
   return Math.min(0.9, Math.max(0, +risk.toFixed(4)));
 }
 
