@@ -41,7 +41,12 @@ function ensureEconomy() {
 }
 
 function cityFactor() {
-  return CITY_FACTOR[state.empire?.world?.cityName] || 1;
+  const world = state.empire?.world || {};
+  const cityId = Number(world.cityId) || 1;
+  const cityBase = CITY_FACTOR[world.cityName] || (0.88 + ((cityId * 17) % 31) / 100);
+  const districtId = Number(world.districtId) || 1;
+  const districtFactor = 0.96 + ((districtId * 7) % 9) / 100;
+  return cityBase * districtFactor;
 }
 
 function logEvent(message) {
