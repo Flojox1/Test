@@ -70,7 +70,7 @@ export const MUSHROOM_TYPES = {
     recipe:{ straw:8.5, bran:1, lime:0.5, bag:4 },
     incubation:40, pinning:8, fruiting:25, rest:12,
     flushYield:[2.2, 1.3, 0.7],
-    priceMult:1.0, contamMult:0.6, climateMin:0.35,
+    priceMult:1.0, fixedPrice:165, contamMult:0.6, climateMin:0.35,
     prepMult:1, coolMult:1, methodMult:STRAW_METHODS
   },
   pink: {
@@ -80,7 +80,7 @@ export const MUSHROOM_TYPES = {
     recipe:{ straw:9, bran:0.5, lime:0.5, bag:4 },
     incubation:30, pinning:5, fruiting:15, rest:9,
     flushYield:[1.8, 1.0, 0.5],
-    priceMult:0.85, contamMult:0.6, climateMin:0.2,
+    priceMult:0.85, fixedPrice:150, contamMult:0.6, climateMin:0.2,
     prepMult:1, coolMult:1, methodMult:STRAW_METHODS
   },
   king: {
@@ -90,7 +90,7 @@ export const MUSHROOM_TYPES = {
     recipe:{ sawdust:7, bran:2.5, gypsum:0.5, bag:4 },
     incubation:85, pinning:28, fruiting:35, rest:30,
     flushYield:[1.8, 0.9],
-    priceMult:2.6, contamMult:1.0, climateMin:0.5,
+    priceMult:2.6, fixedPrice:650, contamMult:1.0, climateMin:0.5,
     prepMult:1.5, coolMult:1.5, methodMult:STERILE_NEEDED
   },
   shiitake: {
@@ -100,7 +100,7 @@ export const MUSHROOM_TYPES = {
     recipe:{ sawdust:8, bran:1.5, gypsum:0.5, bag:4 },
     incubation:150, pinning:15, fruiting:30, rest:40,
     flushYield:[1.8, 1.2, 0.7],
-    priceMult:2.9, contamMult:1.4, climateMin:0.72,
+    priceMult:2.9, fixedPrice:2200, contamMult:1.4, climateMin:0.72,
     prepMult:1.6, coolMult:1.5, methodMult:STERILE_NEEDED
   },
   agaricus: {
@@ -110,7 +110,7 @@ export const MUSHROOM_TYPES = {
     recipe:{ straw:4.5, manure:4, gypsum:0.5, peat:1 },
     incubation:55, pinning:20, fruiting:14, rest:8,
     flushYield:[2.2, 1.2, 0.7],
-    priceMult:1.0, contamMult:1.1, climateMin:0.5,
+    priceMult:1.0, fixedPrice:450, contamMult:1.1, climateMin:0.5,
     prepMult:2, coolMult:1.5, methodMult:COMPOST_METHODS
   },
   enoki: {
@@ -120,7 +120,7 @@ export const MUSHROOM_TYPES = {
     recipe:{ sawdust:4.5, corncob:3, bran:2, gypsum:0.5, bag:4 },
     incubation:65, pinning:30, fruiting:30, rest:25,
     flushYield:[2.0, 0.8],
-    priceMult:2.4, contamMult:1.3, climateMin:0.88,
+    priceMult:2.4, fixedPrice:10500, contamMult:1.3, climateMin:0.88,
     prepMult:1.5, coolMult:1.5, methodMult:STERILE_NEEDED
   },
   lions: {
@@ -130,7 +130,7 @@ export const MUSHROOM_TYPES = {
     recipe:{ sawdust:7.5, bran:2, gypsum:0.5, bag:4 },
     incubation:50, pinning:15, fruiting:30, rest:20,
     flushYield:[1.8, 1.0],
-    priceMult:2.0, contamMult:1.1, climateMin:0.72,
+    priceMult:2.0, fixedPrice:2000, contamMult:1.1, climateMin:0.72,
     prepMult:1.5, coolMult:1.5, methodMult:STERILE_NEEDED
   }
 };
