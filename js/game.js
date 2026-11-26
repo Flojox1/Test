@@ -1131,7 +1131,7 @@ export function openBatchModal(id) {
       <div class="bd-row"><span class="k">Yöntem</span><span class="v">${METHODS[b.method].name}</span></div>
       <div class="bd-row"><span class="k">İlerleme</span><span class="v">${Math.round(b.progress||0)}%</span></div>
       <div class="bd-row"><span class="k">Kalan süre</span><span class="v">${timeLeft}</span></div>
-      <div class="bd-row"><span class="k">Kontaminasyon riski</span><span class="v ${risk>0.1?'danger':'green'}">%${Math.round(risk*100)}</span></div>
+      <div class="bd-row"><span class="k">Kontaminasyon riski</span><span class="v ${risk>0.1?'danger':'green'}">%${riskPercent(risk)}</span></div>
     </div>
     ${actionHtml}
     <button class="close" id="modalClose">Kapat</button>
