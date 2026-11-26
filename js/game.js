@@ -1520,7 +1520,7 @@ export function setupEvents() {
       state.empire.world.setupComplete = true;
       save();
       render();
-
+    }
   });
 
   tabContent.addEventListener('keydown', (e) => {
