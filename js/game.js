@@ -48,23 +48,23 @@ async function ensureEmpireDistricts() {
   empireLocationLoading = 'districts';
   empireLocationError = '';
   try {
-    // Nested endpoint bazı ağlarda/CDN önbelleklerinde sorun çıkarırsa
-    // belgelenmiş provinceId filtreli liste endpoint'ine geç.
-    let response = await fetch(`https://api.turkiyeapi.dev/v2/provinces/${cityId}/districts?fields=id,name,provinceId&sort=name&limit=1000`);
-    if (!response.ok) {
-      response = await fetch(`https://api.turkiyeapi.dev/v2/districts?provinceId=${cityId}&fields=id,name,provinceId&sort=name&limit=1000`);
-    }
+    // Tek ve belgelenmiş sorgu: seçilen ilin plaka/il ID'sine bağlı ilçeler.
+    const url = `https://api.turkiyeapi.dev/v2/districts?provinceId=${cityId}&limit=1000&fields=id,name,provinceId&sort=name`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error(`İlçe servisi HTTP ${response.status}`);
     const result = await response.json();
+    const rows = Array.isArray(result.data) ? result.data : [];
+    const matchingRows = rows.filter(d => Number(d.provinceId) === cityId);
     if (Number(state.empire?.world?.cityId) === cityId) {
-      empireDistricts = Array.isArray(result.data)
-        ? result.data.filter(d => Number(d.provinceId) === cityId || d.provinceId == null)
-        : [];
+      if (!matchingRows.length) {
+        const detail = result.error?.message || 'Seçilen il için ilçe kaydı dönmedi.';
+        throw new Error(detail);
+      }
+      empireDistricts = matchingRows.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
       empireDistrictsFor = cityId;
-      if (!empireDistricts.length) throw new Error('Bu şehir için ilçe kaydı bulunamadı.');
     }
   } catch (error) {
-    empireLocationError = `İlçeler yüklenemedi: ${error?.message || 'API bağlantısı kurulamadı'}. Tekrar deneyebilirsin.`;
+    empireLocationError = `İlçeler yüklenemedi: ${error?.message || 'API bağlantısı kurulamadı'}. Tekrar yükle butonunu kullanabilirsin.`;
     console.warn('Empire ilçe listesi yüklenemedi:', error);
   } finally {
     empireLocationLoading = '';
