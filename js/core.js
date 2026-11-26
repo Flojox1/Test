@@ -372,9 +372,13 @@ export function consumeMaterialsForType(type) {
 
 /* ---------- FORMAT ---------- */
 export function fmt(n) {
-  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
-  return Math.floor(n).toString();
+  const value = Number(n) || 0;
+  const compact = (amount, suffix) => `${(amount).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ${suffix}`;
+  if (Math.abs(value) >= 1e12) return compact(value / 1e12, 'Tn');
+  if (Math.abs(value) >= 1e9) return compact(value / 1e9, 'Mr');
+  if (Math.abs(value) >= 1e6) return compact(value / 1e6, 'Mn');
+  if (Math.abs(value) >= 1e3) return compact(value / 1e3, 'B');
+  return Math.floor(value).toLocaleString('tr-TR');
 }
 export function fmtMoney(n) { return '₺' + fmt(n); }
 
