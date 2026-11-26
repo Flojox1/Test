@@ -80,6 +80,16 @@ function advanceEmpireDay() {
     const conditionFactor = Math.max(0.45, business.condition / 100);
     const activityFactor = Math.max(0.5, Math.min(1.5, Number(business.activity) || 1));
     const gross = item.income * cityFactor() * levelFactor * staffFactor * conditionFactor * activityFactor;
+    const hiddenFlow = Math.min(e.dirtyBalance, Math.max(0, Number(business.dailyFlow) || 0));
+    if (hiddenFlow > 0) {
+      const flowRatio = hiddenFlow / Math.max(1, gross);
+      const returnedAmount = Math.round(hiddenFlow * 0.82);
+      e.dirtyBalance -= hiddenFlow;
+      state.money += returnedAmount;
+      net += returnedAmount;
+      business.suspicion = Math.min(100, (business.suspicion || 0) + Math.max(0, flowRatio - 0.25) * 0.18);
+      e.suspicion = Math.min(100, e.suspicion + Math.max(0, flowRatio - 0.25) * 0.06);
+    }
     const expense = item.upkeep * levelFactor + business.staff * 650;
     const profit = Math.round(gross - expense);
     state.money += profit;
@@ -167,6 +177,7 @@ function renderBusinessPanel() {
     const frozen = b.frozen || e.frozenUntil >= e.day;
     return '<article class="eb-card"><div class="eb-title"><span>' + item.icon + ' ' + b.name + '</span><b>Sv. ' + b.level + '</b></div>' +
       '<p>Çalışan: ' + b.staff + ' · Durum: %' + Math.round(b.condition) + ' · Şüphe: %' + Math.round(b.suspicion || 0) + '</p>' +
+      '<label class="eb-activity">Günlük gizli fon talebi (₺)<input type="number" min="0" step="1000" value="' + Math.round(b.dailyFlow || 0) + '" data-eb-flow="' + b.id + '"></label>' +
       '<label class="eb-activity">Günlük faaliyet seviyesi: <b>%' + Math.round((b.activity || 1) * 100) + '</b><input type="range" min="50" max="150" step="5" value="' + Math.round((b.activity || 1) * 100) + '" data-eb-activity="' + b.id + '"></label>' +
       '<p>' + (frozen ? '⛔ Geçici olarak kapalı' : '🟢 Faaliyette') + '</p>' +
       '<div class="eb-actions"><button class="btn btn-ghost" data-eb="upgrade" data-id="' + b.id + '">Geliştir</button><button class="btn btn-ghost" data-eb="staff" data-id="' + b.id + '">Personel al</button><button class="btn btn-ghost" data-eb="repair" data-id="' + b.id + '">Bakım yap</button></div></article>';
@@ -187,7 +198,7 @@ function addStyles() {
   if (document.getElementById('empireBusinessStyles')) return;
   const style = document.createElement('style');
   style.id = 'empireBusinessStyles';
-  style.textContent = '.empire-business-panel{margin-top:20px}.eb-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:20px 0 12px}.eb-heading h2{font:800 1.15rem var(--font-head)}.eb-heading span,.eb-muted,.eb-note{color:var(--muted);font-size:.7rem}.eb-summary,.eb-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0 18px}.eb-summary>div,.eb-card,.eb-log{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;min-width:0}.eb-summary small,.eb-summary b{display:block}.eb-summary small{font-size:.62rem;color:var(--muted)}.eb-summary b{font-size:.85rem;margin-top:5px;overflow-wrap:anywhere}.eb-card p{font-size:.68rem;color:var(--muted);margin:8px 0}.eb-activity{display:block;font-size:.65rem;color:var(--muted);margin:10px 0}.eb-activity b{color:var(--gold)}.eb-activity input{display:block;width:100%;margin-top:7px;accent-color:var(--green-bright)}.eb-title{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;font-weight:700}.eb-title b{color:var(--gold);white-space:nowrap}.eb-card .btn{font-size:.62rem;padding:8px}.eb-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}.eb-day{width:100%;margin:4px 0 18px;min-height:44px}.empire-business-panel h3{font:700 .8rem var(--font-head);margin:18px 0 8px}.eb-log{max-height:220px;overflow:auto}.eb-log p{font-size:.68rem;color:var(--muted);padding:5px 0;border-bottom:1px solid var(--border)}.eb-log p:last-child{border:0}.eb-note{line-height:1.5;margin-top:10px}@media(max-width:520px){.eb-summary,.eb-grid{grid-template-columns:1fr 1fr}.eb-card{padding:10px}.eb-actions .btn{flex:1}}';
+  style.textContent = '.empire-business-panel{margin-top:20px}.eb-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:20px 0 12px}.eb-heading h2{font:800 1.15rem var(--font-head)}.eb-heading span,.eb-muted,.eb-note{color:var(--muted);font-size:.7rem}.eb-summary,.eb-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:10px 0 18px}.eb-summary>div,.eb-card,.eb-log{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;min-width:0}.eb-summary small,.eb-summary b{display:block}.eb-summary small{font-size:.62rem;color:var(--muted)}.eb-summary b{font-size:.85rem;margin-top:5px;overflow-wrap:anywhere}.eb-card p{font-size:.68rem;color:var(--muted);margin:8px 0}.eb-activity{display:block;font-size:.65rem;color:var(--muted);margin:10px 0}.eb-activity b{color:var(--gold)}.eb-activity input{display:block;width:100%;margin-top:7px;accent-color:var(--green-bright)}.eb-activity input[type=number]{box-sizing:border-box;min-height:36px;padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);accent-color:auto}.eb-title{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;font-weight:700}.eb-title b{color:var(--gold);white-space:nowrap}.eb-card .btn{font-size:.62rem;padding:8px}.eb-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}.eb-day{width:100%;margin:4px 0 18px;min-height:44px}.empire-business-panel h3{font:700 .8rem var(--font-head);margin:18px 0 8px}.eb-log{max-height:220px;overflow:auto}.eb-log p{font-size:.68rem;color:var(--muted);padding:5px 0;border-bottom:1px solid var(--border)}.eb-log p:last-child{border:0}.eb-note{line-height:1.5;margin-top:10px}@media(max-width:520px){.eb-summary,.eb-grid{grid-template-columns:1fr 1fr}.eb-card{padding:10px}.eb-actions .btn{flex:1}}';
   document.head.appendChild(style);
 }
 
@@ -195,6 +206,15 @@ export function initEmpireBusiness() {
   if (mounted) return;
   mounted = true;
   addStyles();
+  document.addEventListener('change', event => {
+    const field = event.target.closest('[data-eb-flow]');
+    if (!field) return;
+    const business = ensureEconomy().businesses.find(x => x.id === field.dataset.ebFlow);
+    if (!business) return;
+    business.dailyFlow = Math.max(0, Math.round(Number(field.value) || 0));
+    field.value = business.dailyFlow;
+    save();
+  });
   document.addEventListener('input', event => {
     const slider = event.target.closest('[data-eb-activity]');
     if (!slider) return;
