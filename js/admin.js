@@ -5,7 +5,7 @@ let dbMod=null, chatEnabled=true;
 async function auth(){return getFirebaseAuth();}
 async function api(path,body){
  const a=await auth(),u=a.currentUser;if(!u)throw new Error('Admin oturumu kapandı.');
- const token=await u.getIdToken(true);
+ const token=await u.getIdToken();
  const r=await fetch(WORKER+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'İşlem başarısız.');return d;
 }
@@ -35,7 +35,7 @@ async function loadPlayers(){
    info.append(name,meta);
    const actions=document.createElement('div');actions.className='admin-actions';
    const money=document.createElement('button');money.className='btn btn-green';money.textContent='Para ekle';
-   money.onclick=async()=>{const amount=Number(prompt('Eklenecek para miktarı:','1000'));if(!Number.isFinite(amount)||amount<=0)return;try{await api('/admin/player-action',{action:'addMoney',uid:p.uid,amount});await loadPlayers();}catch(e){alert(e.message);}};
+   money.onclick=async()=>{const amount=Number(prompt('Eklenecek para miktarı:','1000'));if(!Number.isFinite(amount)||amount<=0)return;money.disabled=true;try{await api('/admin/player-action',{action:'addMoney',uid:p.uid,amount});p.money=Number(p.money||0)+amount;meta.textContent=(p.email||p.uid)+' · ₺'+Number(p.money).toLocaleString('tr-TR');money.textContent='Eklendi ✓';setTimeout(()=>{money.textContent='Para ekle';money.disabled=false;},900);}catch(e){money.disabled=false;alert(e.message);}};
    const reset=document.createElement('button');reset.className='btn btn-ghost';reset.textContent='Sıfırla';
    reset.onclick=async()=>{if(!confirm(p.name+' oyuncusunun oyun kaydı sıfırlansın mı?'))return;try{await api('/admin/player-action',{action:'reset',uid:p.uid});await loadPlayers();}catch(e){alert(e.message);}};
    const ban=document.createElement('button');ban.className='btn admin-danger';ban.textContent='Banla';
@@ -58,17 +58,33 @@ async function loadChat(){
    const time=document.createElement('small');time.className='admin-muted';time.textContent=new Date(m.ts||Date.now()).toLocaleString('tr-TR');
    content.append(who,body,time);
    const del=document.createElement('button');del.className='btn admin-danger';del.textContent='Sil';
-   del.onclick=async()=>{if(!confirm('Bu mesaj silinsin mi?'))return;try{await api('/admin/chat-action',{action:'delete',id:m.id});await loadChat();}catch(e){alert(e.message);}};
+   del.onclick=async()=>{if(!confirm('Bu mesaj silinsin mi?'))return;del.disabled=true;try{await api('/admin/chat-action',{action:'delete',id:m.id});row.remove();if(!$('chatList').querySelector('.admin-row'))$('chatList').textContent='Sohbette mesaj yok.';}catch(e){del.disabled=false;alert(e.message);}};
    row.append(content,del);$('chatList').append(row);
   });
   if(!d.messages.length)$('chatList').textContent='Sohbette mesaj yok.';
   chatEnabled=d.chatEnabled!==false;
-  $('chatToggleAdmin').textContent=chatEnabled?'Sohbeti kapat':'Sohbeti aç';
+  $('chatToggleAdmin').textContent=chatEnabled?'Sohbeti kapat':'Sohbeti aç';$('chatToggleAdmin').classList.toggle('admin-danger',chatEnabled);$('chatToggleAdmin').classList.toggle('admin-ok',!chatEnabled);$('chatStateLabel').textContent=chatEnabled?'Sohbet açık':'Sohbet kapalı';
  }catch(e){$('chatList').textContent=e.message;}
 }
 $('adminLogin').addEventListener('submit',login);
 $('refreshPlayers').addEventListener('click',loadPlayers);
 $('adminLogout').addEventListener('click',async()=>{const a=await auth();await (await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js')).signOut(a);$('dashboard').hidden=true;$('loginCard').hidden=false;});
-document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-admin-tab]').forEach(x=>x.classList.toggle('active',x===b));$('playersPane').hidden=b.dataset.adminTab!=='players';$('chatPane').hidden=b.dataset.adminTab!=='chat';if(b.dataset.adminTab==='chat')loadChat();}));
+let chatPoll=null;document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-admin-tab]').forEach(x=>x.classList.toggle('active',x===b));$('playersPane').hidden=b.dataset.adminTab!=='players';$('chatPane').hidden=b.dataset.adminTab!=='chat';if(b.dataset.adminTab==='chat'){loadChat();if(chatPoll)clearInterval(chatPoll);chatPoll=setInterval(()=>{if(!document.hidden&&!$('chatPane').hidden)loadChat();},4000);}else if(chatPoll){clearInterval(chatPoll);chatPoll=null;}}));
 $('chatToggleAdmin').addEventListener('click',async()=>{try{await api('/admin/chat-action',{action:'toggle',enabled:!chatEnabled});chatEnabled=!chatEnabled;$('chatToggleAdmin').textContent=chatEnabled?'Sohbeti kapat':'Sohbeti aç';}catch(e){alert(e.message);}});
 $('clearChat').addEventListener('click',async()=>{if(!confirm('Tüm sohbet mesajları kalıcı olarak silinsin mi?'))return;try{await api('/admin/chat-action',{action:'clear'});await loadChat();}catch(e){alert(e.message);}});
+
+async function showDashboard(){
+ $('loginCard').hidden=true;$('dashboard').hidden=false;status('');
+ await loadPlayers();
+}
+(async()=>{
+ try{
+  const app=await getFirebaseApp();
+  const {getAuth,onAuthStateChanged}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+  const a=getAuth(app);
+  onAuthStateChanged(a,async user=>{
+   if(user && user.uid==='florod-admin'){try{await showDashboard();}catch(e){status(e.message,true);}}
+   else {$('dashboard').hidden=true;$('loginCard').hidden=false;}
+  });
+ }catch(e){status(e.message,true);}
+})();
