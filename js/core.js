@@ -77,7 +77,7 @@ async function writeCloudSave() {
   const user = auth.currentUser;
   if (!user || user.uid !== uid) return;
 
-  const token = await user.getIdToken();
+  const token = await user.getIdToken(true);
   const response = await fetch(cloudSaveUrl(uid, token), {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -172,7 +172,7 @@ export async function load(uid) {
     throw new Error("Oturum ile kayıt hesabı eşleşmiyor. Yeniden giriş yap.");
   }
 
-  const token = await user.getIdToken();
+  const token = await user.getIdToken(true);
   const response = await fetch(cloudSaveUrl(uid, token));
 
   if (!response.ok) {
