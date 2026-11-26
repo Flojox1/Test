@@ -288,7 +288,8 @@ async function handleAdminApi(request, env, pathname) {
   }
   if (pathname === "/admin/chat" && request.method === "GET") {
     const messages = await dbRequest("chat", env) || {};
-    return json({ messages: Object.entries(messages).slice(-100).map(([id, msg]) => ({ id, ...msg })) });
+    const enabled = await dbRequest("settings/chatEnabled", env);
+    return json({ messages: Object.entries(messages).slice(-100).map(([id, msg]) => ({ id, ...msg })), chatEnabled: enabled !== false });
   }
   if (pathname === "/admin/chat-action" && request.method === "POST") {
     const body = await request.json().catch(() => ({}));
