@@ -62,7 +62,8 @@ try {
       profileBack.classList.add('open');
       profileBack.setAttribute('aria-hidden', 'false');
     });
-    document.getElementById('profileClose').addEventListener('click', closeProfile);\n    document.getElementById('playerLogout').addEventListener('click', async () => { if (!confirm('Hesabından çıkış yapmak istiyor musun?')) return; const auth = await getFirebaseAuth(); const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js'); await signOut(auth); window.location.replace('index.html'); });
+    document.getElementById('profileClose').addEventListener('click', closeProfile);
+    document.getElementById('playerLogout').addEventListener('click', async () => { if (!confirm('Hesabından çıkış yapmak istiyor musun?')) return; const auth = await getFirebaseAuth(); const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js'); await signOut(auth); window.location.replace('index.html'); });
     profileBack.addEventListener('click', event => {
       if (event.target === profileBack) closeProfile();
     });
