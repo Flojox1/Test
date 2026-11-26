@@ -175,7 +175,10 @@ function normalizeState() {
 
 export async function load(uid) {
   if (!uid) throw new Error("Hesap kimliği bulunamadı.");
-  activeSaveUid = uid;
+
+  // Bulut kaydı başarıyla okunup doğrulanana kadar otomatik bulut yazımını kapalı tut.
+  // Böylece başka cihazdaki boş başlangıç durumu mevcut kaydın üzerine yazamaz.
+  activeSaveUid = null;
 
   const auth = await getFirebaseAuth();
   const user = auth.currentUser;
@@ -194,14 +197,12 @@ export async function load(uid) {
   const cloudSave = await response.json();
 
   if (isValidSave(cloudSave)) {
-    // Buluttaki kayıt her zaman önceliklidir.
+    // Yalnızca doğrulanmış bulut kaydı yüklendikten sonra yazmaya izin ver.
     applySave(cloudSave);
+    activeSaveUid = uid;
   } else {
-    // Firebase'de bir kayıt VAR ama biçimi tanınmıyorsa,
-    // cihazdaki boş/yeni oyunla üzerine yazmayı kesinlikle engelle.
     if (cloudSave !== null) {
-      activeSaveUid = null;
-      throw new Error("Bulut kaydı bulundu ancak okunamadı. Mevcut kayıt korunuyor; hiçbir şeyin üzerine yazılmadı.");
+      throw new Error("Bulut kaydı bulundu ancak okunamadı. Kayıt korunuyor; buluta yazım kapalı.");
     }
 
     const localKey = `${SAVE_KEY}_${uid}`;
@@ -216,15 +217,12 @@ export async function load(uid) {
       console.warn("Eski kayıt okunamadı:", e);
     }
 
-    if (isValidSave(parsed)) {
-      applySave(parsed);
-    } else {
-      refreshMasterPool();
-      refreshMarket();
+    if (!isValidSave(parsed)) {
+      throw new Error("Bu hesap için bulutta kayıt bulunamadı ve bu cihazda aktarılabilecek eski kayıt yok. Mevcut kayıt güvenliği için otomatik kayıt durduruldu.");
     }
 
-    // Yalnızca bulutta hiç kayıt yoksa ilk kayıt oluşturulur.
-    save();
+    applySave(parsed);
+    activeSaveUid = uid;
   }
 
   const elapsed = Math.max(0, (Date.now() - (state.lastTick || Date.now())) / 1000);
