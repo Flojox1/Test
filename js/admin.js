@@ -62,8 +62,7 @@ async function loadChat(){
    row.append(content,del);$('chatList').append(row);
   });
   if(!d.messages.length)$('chatList').textContent='Sohbette mesaj yok.';
-  const app=await getFirebaseApp();const {getDatabase,ref,get}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js');
-  const snap=await get(ref(getDatabase(app),'settings/chatEnabled'));chatEnabled=snap.exists()?snap.val()!==false:true;
+  chatEnabled=d.chatEnabled!==false;
   $('chatToggleAdmin').textContent=chatEnabled?'Sohbeti kapat':'Sohbeti aç';
  }catch(e){$('chatList').textContent=e.message;}
 }
