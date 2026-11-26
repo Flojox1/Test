@@ -54,7 +54,7 @@ async function getGoogleAccessToken(env) {
   const unsigned = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" })) + "." +
     base64url(JSON.stringify({
       iss: serviceAccount.client_email,
-      scope: "https://www.googleapis.com/auth/identitytoolkit https://www.googleapis.com/auth/firebase.database",
+      scope: "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/identitytoolkit",
       aud: "https://oauth2.googleapis.com/token",
       iat: now,
       exp: now + 3600
