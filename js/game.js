@@ -152,7 +152,7 @@ function renderEmpireSetup() {
   // Seçim ekranı yarıda kapatılıp yeniden açılırsa kayıtlı konumun listelerini geri yükle.
   if (world.cityId && empireDistrictsFor !== Number(world.cityId) && !empireLocationLoading && !empireLocationError) {
     ensureEmpireDistricts();
-
+  }
 }
 
 function renderEmpireHome() {
