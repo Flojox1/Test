@@ -34,6 +34,184 @@ const expandedPlots = new Set();   // Üretim'de açık olan arsalar (plaka)
 let selectedPlate = null;          // Arsalar sekmesinde seçili il
 
 const tl = n => '₺' + Math.round(n).toLocaleString('tr-TR');
+
+let empireDistricts = [];
+let empireNeighborhoods = [];
+let empireDistrictsFor = null;
+let empireNeighborhoodsFor = null;
+let empireLocationLoading = '';
+let empireLocationError = '';
+
+async function ensureEmpireDistricts() {
+  const cityId = Number(state.empire?.world?.cityId);
+  if (!cityId || empireDistrictsFor === cityId || empireLocationLoading === 'districts') return;
+  empireLocationLoading = 'districts';
+  empireLocationError = '';
+  try {
+    const response = await fetch(`https://api.turkiyeapi.dev/v2/provinces/${cityId}/districts?fields=id,name&sort=name&limit=1000`);
+    if (!response.ok) throw new Error('İlçe listesi alınamadı.');
+    const result = await response.json();
+    empireDistricts = Array.isArray(result.data) ? result.data : [];
+    empireDistrictsFor = cityId;
+  } catch (error) {
+    empireLocationError = 'İlçe listesi yüklenemedi. İnternet bağlantını kontrol edip tekrar dene.';
+    console.warn('Empire ilçe listesi yüklenemedi:', error);
+  } finally {
+    empireLocationLoading = '';
+    renderEmpireSetup();
+  }
+}
+
+async function ensureEmpireNeighborhoods() {
+  const districtId = Number(state.empire?.world?.districtId);
+  if (!districtId || empireNeighborhoodsFor === districtId || empireLocationLoading === 'neighborhoods') return;
+  empireLocationLoading = 'neighborhoods';
+  empireLocationError = '';
+  try {
+    const response = await fetch(`https://api.turkiyeapi.dev/v2/districts/${districtId}/neighborhoods?fields=id,name&sort=name&limit=1000`);
+    if (!response.ok) throw new Error('Mahalle listesi alınamadı.');
+    const result = await response.json();
+    empireNeighborhoods = Array.isArray(result.data) ? result.data : [];
+    empireNeighborhoodsFor = districtId;
+  } catch (error) {
+    empireLocationError = 'Mahalle listesi yüklenemedi. İnternet bağlantını kontrol edip tekrar dene.';
+    console.warn('Empire mahalle listesi yüklenemedi:', error);
+  } finally {
+    empireLocationLoading = '';
+    renderEmpireSetup();
+  }
+}
+
+function chooseEmpireCity(plate) {
+  const province = PROVINCES.find(p => Number(p.plate) === Number(plate));
+  if (!province) return;
+  state.empire.world.cityId = province.plate;
+  state.empire.world.cityName = province.name;
+  state.empire.world.districtId = null;
+  state.empire.world.districtName = null;
+  state.empire.world.neighborhoodId = null;
+  state.empire.world.neighborhoodName = null;
+  state.empire.world.setupComplete = false;
+  empireDistricts = [];
+  empireNeighborhoods = [];
+  empireDistrictsFor = null;
+  empireNeighborhoodsFor = null;
+  selectedPlate = province.plate;
+  save();
+  renderEmpireSetup();
+  ensureEmpireDistricts();
+}
+
+function renderEmpireSetup() {
+  document.body.classList.add('empire-mode');
+  document.querySelector('.hud')?.setAttribute('hidden', '');
+  document.getElementById('tabs')?.setAttribute('hidden', '');
+  document.getElementById('chatToggle')?.setAttribute('hidden', '');
+  const world = state.empire.world;
+  const selectedCity = PROVINCES.find(p => Number(p.plate) === Number(world.cityId));
+  const paths = [];
+  let selectedPath = '';
+  PROVINCES.forEach(p => {
+    const isSelected = selectedCity && Number(selectedCity.plate) === Number(p.plate);
+    const path = `<path class="prov${isSelected ? ' sel' : ''}" data-action="selectProvince" data-plate="${p.plate}" d="${p.path}"><title>${p.name}</title></path>`;
+    if (isSelected) selectedPath = path; else paths.push(path);
+  });
+  const cityOptions = [...PROVINCES].sort((a,b) => a.name.localeCompare(b.name,'tr'))
+    .map(p => `<option value="${p.plate}" ${Number(world.cityId)===Number(p.plate)?'selected':''}>${p.name}</option>`).join('');
+  let locationControls = '';
+  if (world.cityId) {
+    const districtOptions = empireDistricts.map(d => `<option value="${d.id}" ${Number(world.districtId)===Number(d.id)?'selected':''}>${d.name}</option>`).join('');
+    locationControls += `
+      <label class="empire-label" for="empireDistrict">İlçe</label>
+      <select class="setting-select empire-select" id="empireDistrict">
+        <option value="">İlçe seç...</option>${districtOptions}
+      </select>`;
+    if (empireLocationLoading === 'districts') locationControls += '<p class="empire-loading">İlçeler yükleniyor...</p>';
+  }
+  if (world.districtId) {
+    const neighborhoodOptions = empireNeighborhoods.map(n => `<option value="${n.id}" ${Number(world.neighborhoodId)===Number(n.id)?'selected':''}>${n.name}</option>`).join('');
+    locationControls += `
+      <label class="empire-label" for="empireNeighborhood">Mahalle</label>
+      <select class="setting-select empire-select" id="empireNeighborhood">
+        <option value="">Mahalle seç...</option>${neighborhoodOptions}
+      </select>`;
+    if (empireLocationLoading === 'neighborhoods') locationControls += '<p class="empire-loading">Mahalleler yükleniyor...</p>';
+  }
+  const ready = !!(world.cityId && world.districtId && world.neighborhoodId);
+  tabContent.innerHTML = `
+    <section class="empire-setup">
+      <div class="empire-kicker">YENİ BİR HAYAT BAŞLIYOR</div>
+      <h1>Dünyanı <em>Seç</em></h1>
+      <p class="empire-intro">Artık kendi hikâyeni yazacaksın. Önce Türkiye haritasından yaşayacağın şehri, ardından ilçeni ve mahalleni seç.</p>
+      <div class="empire-step"><span>01</span><div><b>Şehir seçimi</b><small>${world.cityName || 'Haritadan bir il seç'}</small></div></div>
+      <div class="empire-map-card">
+        <div class="map-tools">
+          <select class="setting-select empire-select" id="empireCitySelect"><option value="">İl seç...</option>${cityOptions}</select>
+        </div>
+        <svg id="trMap" class="tr-map" viewBox="${mapViewBox()}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Türkiye şehir seçme haritası">${paths.join('')}${selectedPath}</svg>
+        <div class="map-legend"><span><i class="dot sel"></i>Seçili şehir</span><span>Haritaya dokunarak veya listeden seçebilirsin.</span></div>
+      </div>
+      <div class="empire-location-card">
+        <div class="empire-step"><span>02</span><div><b>İlçe ve mahalle</b><small>${world.districtName || 'Önce şehir seçmelisin'}</small></div></div>
+        ${locationControls}
+        ${empireLocationError ? `<p class="empire-error">${empireLocationError}</p><button class="btn btn-ghost" id="empireRetryLocation" type="button">Tekrar yükle</button>` : ''}
+        <button class="btn btn-green empire-continue" id="empireFinishSetup" type="button" ${ready?'':'disabled'}>BU KONUMDA BAŞLA</button>
+      </div>
+    </section>`;
+  if (document.getElementById('trMap')) setupMapInteractions(document.getElementById('trMap'));
+  const citySelect = document.getElementById('empireCitySelect');
+  citySelect?.addEventListener('change', e => chooseEmpireCity(Number(e.target.value)));
+  document.getElementById('empireRetryLocation')?.addEventListener('click', () => {
+    empireLocationError = '';
+    if (world.cityId && !world.districtId) { empireDistrictsFor = null; ensureEmpireDistricts(); }
+    else if (world.districtId) { empireNeighborhoodsFor = null; ensureEmpireNeighborhoods(); }
+  });
+  document.getElementById('empireFinishSetup')?.addEventListener('click', () => {
+    if (!world.cityId || !world.districtId || !world.neighborhoodId) return;
+    world.setupComplete = true;
+    state.empire.unlocked = true;
+    save();
+    render();
+  });
+}
+
+function renderEmpireHome() {
+  document.body.classList.add('empire-mode');
+  document.querySelector('.hud')?.setAttribute('hidden', '');
+  document.getElementById('tabs')?.setAttribute('hidden', '');
+  document.getElementById('chatToggle')?.setAttribute('hidden', '');
+  const character = state.empire.character || createCharacter({ generation: 1 });
+  state.empire.character = character;
+  const world = state.empire.world;
+  const statRows = Object.entries(character.stats || {}).map(([key,value]) => `
+    <div class="empire-stat"><span>${({strength:'Güç',charisma:'Karizma',intelligence:'Zekâ',knowledge:'Bilgi',agility:'Çeviklik',endurance:'Dayanıklılık',leadership:'Liderlik',persuasion:'İkna'})[key] || key}</span><b>${value}/100</b><i><u style="width:${Math.max(0,Math.min(100,Number(value)||0))}%"></u></i></div>`).join('');
+  const needRows = Object.entries(character.needs || {}).map(([key,value]) => `
+    <div class="empire-need"><span>${({hunger:'Açlık',thirst:'Susuzluk',energy:'Enerji',sleep:'Uyku',health:'Sağlık',stress:'Stres'})[key] || key}</span><b>${value}/100</b></div>`).join('');
+  tabContent.innerHTML = `
+    <section class="empire-home">
+      <div class="empire-kicker">FLO ROD · EMPIRE</div>
+      <h1>Yeni <em>Hayatın</em></h1>
+      <p class="empire-intro">İlk adımını attın. Şimdi bu şehirde kendi düzenini kurma zamanı.</p>
+      <div class="empire-location-card">
+        <div class="empire-kicker">YAŞADIĞIN YER</div>
+        <h2>📍 ${world.neighborhoodName}, ${world.districtName}</h2>
+        <p>${world.cityName}</p>
+      </div>
+      <div class="empire-location-card">
+        <div class="empire-kicker">KARAKTER</div>
+        <h2>${character.name}</h2>
+        <p>${character.age} yaş · ${character.generation}. nesil</p>
+        <div class="empire-stats-grid">${statRows}</div>
+      </div>
+      <div class="empire-location-card">
+        <div class="empire-kicker">İHTİYAÇLAR</div>
+        <div class="empire-needs-grid">${needRows}</div>
+      </div>
+      <div class="hint">Empire dünyasının temeli hazır. Sıradaki aşamada şehir yaşamı, ihtiyaçlar, beceriler ve işletme sistemlerini ekleyeceğiz.</div>
+    </section>`;
+}
+
+
 const riskPercent = risk => (Math.max(0, risk) * 100).toFixed(2);
 function batchTimeLabel(b) {
   if (b.phase === 'ready') return 'HASADA HAZIR';
@@ -442,6 +620,15 @@ export function renderHUD() {
 }
 
 export function render() {
+  if (state.empire?.unlocked) {
+    if (state.empire.world?.setupComplete) renderEmpireHome();
+    else renderEmpireSetup();
+    return;
+  }
+  document.body.classList.remove('empire-mode');
+  document.querySelector('.hud')?.removeAttribute('hidden');
+  document.getElementById('tabs')?.removeAttribute('hidden');
+  document.getElementById('chatToggle')?.removeAttribute('hidden');
   renderHUD();
   if (activeTab === 'uretim') renderUretim();
   else if (activeTab === 'arsalar') renderArsalar();
@@ -452,6 +639,7 @@ export function render() {
 
 // Not: Arsalar sekmesi canlı yenilenmez (harita her saniye yeniden çizilmesin diye).
 export function renderLive() {
+  if (state.empire?.unlocked) return;
   renderHUD();
   if (activeTab === 'uretim') {
     if (uretimView === 'container' && viewingContainerId != null) {
@@ -1279,8 +1467,8 @@ export function setupEvents() {
     }
     else if (a === 'selectProvince') {
       if (mapDragged) { mapDragged = false; return; }   // sürükleme, tıklama değil
-      selectedPlate = parseInt(btn.dataset.plate);
-      renderArsalar();
+      if (state.empire?.unlocked && !state.empire.world?.setupComplete) chooseEmpireCity(parseInt(btn.dataset.plate));
+      else { selectedPlate = parseInt(btn.dataset.plate); renderArsalar(); }
     }
     else if (a === 'closePanel') { selectedPlate = null; renderArsalar(); }
     else if (a === 'buyPlot') buyPlot(parseInt(btn.dataset.plate));
@@ -1316,15 +1504,40 @@ export function setupEvents() {
       state.empire.history = state.empire.history || { generation: 0, previousCharacters: [] };
       state.empire.history.generation = 1;
       state.empire.character = createCharacter({ generation: 1 });
+      state.empire.world = { cityId: null, cityName: null, districtId: null, districtName: null, neighborhoodId: null, neighborhoodName: null, propertyId: null, setupComplete: false };
       save();
       render();
-      alert('Özel fırsat satın alındı! Yeni simülasyon dünyasının kilidi açıldı. Şehir ve mahalle seçimi bir sonraki geliştirme aşamasında hazırlanacak.');
     }
     else if (a === 'hireMaster') {
       const targetSelect = document.getElementById(btn.dataset.targetSelect);
       hireMaster(parseFloat(btn.dataset.id), targetSelect?.value);
     }
     else if (a === 'fireMaster') fireMaster(parseFloat(btn.dataset.id));
+  });
+
+  tabContent.addEventListener('change', async (e) => {
+    if (e.target.id === 'empireDistrict') {
+      const id = Number(e.target.value);
+      const district = empireDistricts.find(item => Number(item.id) === id);
+      if (!district) return;
+      state.empire.world.districtId = district.id;
+      state.empire.world.districtName = district.name;
+      state.empire.world.neighborhoodId = null;
+      state.empire.world.neighborhoodName = null;
+      empireNeighborhoods = [];
+      empireNeighborhoodsFor = null;
+      save();
+      renderEmpireSetup();
+      ensureEmpireNeighborhoods();
+    } else if (e.target.id === 'empireNeighborhood') {
+      const id = Number(e.target.value);
+      const neighborhood = empireNeighborhoods.find(item => Number(item.id) === id);
+      if (!neighborhood) return;
+      state.empire.world.neighborhoodId = neighborhood.id;
+      state.empire.world.neighborhoodName = neighborhood.name;
+      save();
+      renderEmpireSetup();
+    }
   });
 
   tabContent.addEventListener('keydown', (e) => {
@@ -1380,7 +1593,7 @@ export function setSpeed(s) {
 
 function startInterval() {
   if (logicInterval) clearInterval(logicInterval);
-  logicInterval = setInterval(() => advanceState(), 1000 / (state.speed || 1));
+  logicInterval = setInterval(() => { if (!state.empire?.unlocked) advanceState(); }, 1000 / (state.speed || 1));
 }
 
 /* ---------- INIT ---------- */
