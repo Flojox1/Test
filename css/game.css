@@ -598,3 +598,67 @@ body {
 @media (min-width:760px) {
   .arsa-wrap.has-sel { grid-template-columns:minmax(0,1fr) 300px; }
 }
+
+
+/* ===== FLO ROD UI POLISH ===== */
+:root { --surface-glass:rgba(20,27,18,.88); --border-soft:rgba(139,195,74,.18); }
+body {
+  background: radial-gradient(ellipse at 12% 0%,rgba(106,168,79,.12),transparent 34%),
+              radial-gradient(ellipse at 92% 18%,rgba(232,197,106,.07),transparent 28%),var(--bg);
+}
+.hud {
+  background:rgba(13,18,12,.96); border-bottom-color:rgba(139,195,74,.24);
+  box-shadow:0 8px 28px rgba(0,0,0,.22); backdrop-filter:blur(14px);
+}
+.stat {
+  border:1px solid rgba(255,255,255,.035);
+  background:linear-gradient(145deg,rgba(34,44,29,.92),rgba(20,26,18,.92));
+}
+.tabs { background:rgba(16,22,14,.96); border-bottom-color:rgba(139,195,74,.2); backdrop-filter:blur(12px); }
+.tab { position:relative; transition:color .2s,background .2s; }
+.tab.active { background:linear-gradient(180deg,rgba(106,168,79,.16),rgba(106,168,79,.04)); }
+.tab.active::after {
+  content:""; position:absolute; left:18%; right:18%; bottom:0; height:2px;
+  background:var(--green-bright); box-shadow:0 0 12px rgba(139,195,74,.45);
+}
+.content { scroll-behavior:smooth; }
+.container-card,.plot-group,.container-list-item,.cart-box,.sell-box,.container-view-head,.container-detail,.setting-row { border-radius:12px; }
+.container-card,.cart-box,.sell-box {
+  background:linear-gradient(145deg,rgba(25,33,22,.98),rgba(17,22,15,.98));
+  border-color:var(--border-soft); box-shadow:0 10px 28px rgba(0,0,0,.16);
+}
+.plot-group,.container-list-item {
+  border-color:rgba(139,195,74,.16);
+  background:linear-gradient(145deg,rgba(27,35,23,.96),rgba(17,22,15,.96));
+  transition:border-color .2s,transform .2s,background .2s;
+}
+.container-list-item:not(.add):active { transform:scale(.985); }
+.container-list-item.add { background:linear-gradient(135deg,rgba(106,168,79,.12),rgba(232,197,106,.06)); }
+.btn,.speed-btn,#resetBtn,.tab { transition:transform .16s ease,filter .16s ease,border-color .16s ease,background .16s ease; }
+.btn:active,.speed-btn:active { transform:translateY(1px) scale(.98); }
+.btn-green { box-shadow:0 5px 16px rgba(106,168,79,.14); }
+.mat {
+  border:1px solid rgba(139,195,74,.12); border-radius:12px;
+  background:linear-gradient(145deg,rgba(25,33,22,.94),rgba(17,22,15,.94));
+  padding:12px; margin-bottom:9px;
+}
+.mat .ico {
+  width:42px; height:42px; display:grid; place-items:center; border-radius:10px;
+  background:rgba(139,195,74,.09); border:1px solid rgba(139,195,74,.12);
+}
+.qty-input,.setting-select {
+  border:1px solid rgba(139,195,74,.24); border-radius:8px;
+  background:rgba(8,12,7,.8); color:var(--text); min-height:40px; padding:8px 10px;
+}
+.qty-input:focus,.setting-select:focus { outline:2px solid rgba(139,195,74,.38); border-color:var(--green-bright); }
+.slot { border-radius:10px; box-shadow:0 8px 20px rgba(0,0,0,.2); }
+.chat-panel {
+  border:1px solid rgba(139,195,74,.28); border-radius:16px 16px 0 0;
+  box-shadow:0 -16px 50px rgba(0,0,0,.42); overflow:hidden;
+}
+.chat-head { background:linear-gradient(110deg,rgba(36,52,28,.98),rgba(17,24,15,.98)); }
+.chat-form input { border-radius:9px; }
+@media (min-width:760px) { .content { max-width:1120px; width:100%; margin-inline:auto; } }
+@media (prefers-reduced-motion:reduce) {
+  *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; }
+}
