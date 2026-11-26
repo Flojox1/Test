@@ -1517,7 +1517,22 @@ export function setupEvents() {
       state.empire.character = createCharacter({ generation: 1 });
       state.empire.world = { cityId: null, cityName: null, districtId: null, districtName: null, neighborhoodId: null, neighborhoodName: null, propertyId: null, setupComplete: false };
       save();
-      render();
+      try {
+        renderEmpireSetup();
+      } catch (error) {
+        console.error('Empire ekranı açılamadı:', error);
+        document.body.classList.add('empire-mode');
+        document.querySelector('.hud')?.setAttribute('hidden', '');
+        document.getElementById('tabs')?.setAttribute('hidden', '');
+        document.getElementById('chatToggle')?.setAttribute('hidden', '');
+        tabContent.innerHTML = `
+          <section class="empire-setup">
+            <div class="empire-kicker">YENİ BİR HAYAT BAŞLIYOR</div>
+            <h1>Empire yüklenemedi</h1>
+            <p class="empire-error">${String(error?.message || error)}</p>
+            <button class="btn btn-green" type="button" onclick="location.reload()">Yeniden yükle</button>
+          </section>`;
+      }
     }
     else if (a === 'hireMaster') {
       const targetSelect = document.getElementById(btn.dataset.targetSelect);
