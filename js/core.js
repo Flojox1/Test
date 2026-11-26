@@ -121,7 +121,8 @@ function normalizeState() {
   if (!state.empire || typeof state.empire !== 'object') state.empire = createEmpireState();
   if (!state.empire.transitionOffer) state.empire.transitionOffer = { available: false, purchased: false, price: null };
   if (!state.empire.world) state.empire.world = { cityId: null, cityName: null, districtId: null, districtName: null, neighborhoodId: null, neighborhoodName: null, propertyId: null, setupComplete: false };
-  if (typeof state.empire.world.setupComplete !== 'boolean') state.empire.world.setupComplete = !!(state.empire.world.cityId && state.empire.world.districtId && state.empire.world.neighborhoodId);
+  if (state.empire.world.cityId && state.empire.world.districtId) state.empire.world.setupComplete = true;
+  else if (typeof state.empire.world.setupComplete !== 'boolean') state.empire.world.setupComplete = false;
   if (state.empire.world.cityName == null) state.empire.world.cityName = null;
   if (state.empire.world.districtName == null) state.empire.world.districtName = null;
   if (state.empire.world.neighborhoodId == null) state.empire.world.neighborhoodId = null;
