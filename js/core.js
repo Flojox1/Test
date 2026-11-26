@@ -1,3 +1,4 @@
+import { createEmpireState } from './empire.js';
 import {
   START_MONEY, BATCH_WEIGHT,
   MATERIALS, MUSHROOM_TYPES, BASE_RECIPE_COST, BATCH_YIELD_AVG,
@@ -28,6 +29,7 @@ function freshDemand() {
 function makeFreshState() {
   return {
     money: START_MONEY,
+    empire: createEmpireState(),
     day: 1,
     tickCount: 0,
     speed: 1,
@@ -116,6 +118,11 @@ export function save() {
 
 // Eski/eksik alanları tamamlar
 function normalizeState() {
+  if (!state.empire || typeof state.empire !== 'object') state.empire = createEmpireState();
+  if (!state.empire.transitionOffer) state.empire.transitionOffer = { available: false, purchased: false, price: null };
+  if (!state.empire.world) state.empire.world = { cityId: null, districtId: null, propertyId: null };
+  if (!state.empire.estate) state.empire.estate = { cash: 0, bank: 0, properties: [], vehicles: [], businesses: [], otherAssets: [] };
+  if (!state.empire.history) state.empire.history = { generation: 0, previousCharacters: [] };
   if (!state.inventory || typeof state.inventory !== 'object') state.inventory = {};
   Object.keys(MATERIALS).forEach(k => {
     if (typeof state.inventory[k] !== 'number' || isNaN(state.inventory[k])) state.inventory[k] = 0;
