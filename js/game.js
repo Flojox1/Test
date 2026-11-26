@@ -36,9 +36,7 @@ let selectedPlate = null;          // Arsalar sekmesinde seçili il
 const tl = n => '₺' + Math.round(n).toLocaleString('tr-TR');
 
 let empireDistricts = [];
-let empireNeighborhoods = [];
 let empireDistrictsFor = null;
-let empireNeighborhoodsFor = null;
 let empireLocationLoading = '';
 let empireLocationError = '';
 
@@ -72,27 +70,6 @@ async function ensureEmpireDistricts() {
   }
 }
 
-async function ensureEmpireNeighborhoods() {
-  const districtId = Number(state.empire?.world?.districtId);
-  if (!districtId || empireNeighborhoodsFor === districtId || empireLocationLoading === 'neighborhoods') return;
-  empireLocationLoading = 'neighborhoods';
-  empireLocationError = '';
-  try {
-    const response = await fetch(`https://api.turkiyeapi.dev/v2/districts/${districtId}/neighborhoods?fields=id,name&sort=name&limit=1000`);
-    if (!response.ok) throw new Error('Mahalle listesi alınamadı.');
-    const result = await response.json();
-    if (Number(state.empire?.world?.districtId) === districtId) {
-      empireNeighborhoods = Array.isArray(result.data) ? result.data : [];
-      empireNeighborhoodsFor = districtId;
-    }
-  } catch (error) {
-    empireLocationError = 'Mahalle listesi yüklenemedi. İnternet bağlantını kontrol edip tekrar dene.';
-    console.warn('Empire mahalle listesi yüklenemedi:', error);
-  } finally {
-    empireLocationLoading = '';
-    renderEmpireSetup();
-  }
-}
 
 function chooseEmpireCity(plate) {
   const province = PROVINCES.find(p => Number(p.plate) === Number(plate));
@@ -101,13 +78,9 @@ function chooseEmpireCity(plate) {
   state.empire.world.cityName = province.name;
   state.empire.world.districtId = null;
   state.empire.world.districtName = null;
-  state.empire.world.neighborhoodId = null;
-  state.empire.world.neighborhoodName = null;
   state.empire.world.setupComplete = false;
   empireDistricts = [];
-  empireNeighborhoods = [];
   empireDistrictsFor = null;
-  empireNeighborhoodsFor = null;
   selectedPlate = province.plate;
   save();
   renderEmpireSetup();
@@ -140,21 +113,12 @@ function renderEmpireSetup() {
       </select>`;
     if (empireLocationLoading === 'districts') locationControls += '<p class="empire-loading">İlçeler yükleniyor...</p>';
   }
-  if (world.districtId) {
-    const neighborhoodOptions = empireNeighborhoods.map(n => `<option value="${n.id}" ${Number(world.neighborhoodId)===Number(n.id)?'selected':''}>${n.name}</option>`).join('');
-    locationControls += `
-      <label class="empire-label" for="empireNeighborhood">Mahalle</label>
-      <select class="setting-select empire-select" id="empireNeighborhood">
-        <option value="">Mahalle seç...</option>${neighborhoodOptions}
-      </select>`;
-    if (empireLocationLoading === 'neighborhoods') locationControls += '<p class="empire-loading">Mahalleler yükleniyor...</p>';
-  }
-  const ready = !!(world.cityId && world.districtId && world.neighborhoodId);
+  const ready = !!(world.cityId && world.districtId);
   tabContent.innerHTML = `
     <section class="empire-setup">
       <div class="empire-kicker">YENİ BİR HAYAT BAŞLIYOR</div>
       <h1>Dünyanı <em>Seç</em></h1>
-      <p class="empire-intro">Artık kendi hikâyeni yazacaksın. Önce Türkiye haritasından yaşayacağın şehri, ardından ilçeni ve mahalleni seç.</p>
+      <p class="empire-intro">Artık kendi hikâyeni yazacaksın. Önce Türkiye haritasından şehrini, ardından ilçeni seç.</p>
       <div class="empire-step"><span>01</span><div><b>Şehir seçimi</b><small>${world.cityName || 'Haritadan bir il seç'}</small></div></div>
       <div class="empire-map-card">
         <div class="map-tools">
@@ -164,7 +128,7 @@ function renderEmpireSetup() {
         <div class="map-legend"><span><i class="dot sel"></i>Seçili şehir</span><span>Haritaya dokunarak veya listeden seçebilirsin.</span></div>
       </div>
       <div class="empire-location-card">
-        <div class="empire-step"><span>02</span><div><b>İlçe ve mahalle</b><small>${world.districtName || 'Önce şehir seçmelisin'}</small></div></div>
+        <div class="empire-step"><span>02</span><div><b>İlçe seçimi</b><small>${world.districtName || 'Önce şehir seçmelisin'}</small></div></div>
         ${locationControls}
         ${empireLocationError ? `<p class="empire-error">${empireLocationError}</p><button class="btn btn-ghost" id="empireRetryLocation" type="button">Tekrar yükle</button>` : ''}
         <button class="btn btn-green empire-continue" id="empireFinishSetup" type="button" ${ready?'':'disabled'}>BU KONUMDA BAŞLA</button>
@@ -176,10 +140,9 @@ function renderEmpireSetup() {
   document.getElementById('empireRetryLocation')?.addEventListener('click', () => {
     empireLocationError = '';
     if (world.cityId && !world.districtId) { empireDistrictsFor = null; ensureEmpireDistricts(); }
-    else if (world.districtId) { empireNeighborhoodsFor = null; ensureEmpireNeighborhoods(); }
   });
   document.getElementById('empireFinishSetup')?.addEventListener('click', () => {
-    if (!world.cityId || !world.districtId || !world.neighborhoodId) return;
+    if (!world.cityId || !world.districtId) return;
     world.setupComplete = true;
     state.empire.unlocked = true;
     save();
@@ -189,9 +152,7 @@ function renderEmpireSetup() {
   // Seçim ekranı yarıda kapatılıp yeniden açılırsa kayıtlı konumun listelerini geri yükle.
   if (world.cityId && empireDistrictsFor !== Number(world.cityId) && !empireLocationLoading && !empireLocationError) {
     ensureEmpireDistricts();
-  } else if (world.districtId && empireNeighborhoodsFor !== Number(world.districtId) && !empireLocationLoading && !empireLocationError) {
-    ensureEmpireNeighborhoods();
-  }
+
 }
 
 function renderEmpireHome() {
@@ -213,7 +174,7 @@ function renderEmpireHome() {
       <p class="empire-intro">İlk adımını attın. Şimdi bu şehirde kendi düzenini kurma zamanı.</p>
       <div class="empire-location-card">
         <div class="empire-kicker">YAŞADIĞIN YER</div>
-        <h2>📍 ${world.neighborhoodName}, ${world.districtName}</h2>
+        <h2>📍 ${world.districtName}</h2>
         <p>${world.cityName}</p>
       </div>
       <div class="empire-location-card">
@@ -1523,7 +1484,7 @@ export function setupEvents() {
       state.empire.history = state.empire.history || { generation: 0, previousCharacters: [] };
       state.empire.history.generation = 1;
       state.empire.character = createCharacter({ generation: 1 });
-      state.empire.world = { cityId: null, cityName: null, districtId: null, districtName: null, neighborhoodId: null, neighborhoodName: null, propertyId: null, setupComplete: false };
+      state.empire.world = { cityId: null, cityName: null, districtId: null, districtName: null, propertyId: null, setupComplete: false };
       save();
       try {
         renderEmpireSetup();
@@ -1556,22 +1517,10 @@ export function setupEvents() {
       if (!district) return;
       state.empire.world.districtId = district.id;
       state.empire.world.districtName = district.name;
-      state.empire.world.neighborhoodId = null;
-      state.empire.world.neighborhoodName = null;
-      empireNeighborhoods = [];
-      empireNeighborhoodsFor = null;
+      state.empire.world.setupComplete = true;
       save();
-      renderEmpireSetup();
-      ensureEmpireNeighborhoods();
-    } else if (e.target.id === 'empireNeighborhood') {
-      const id = Number(e.target.value);
-      const neighborhood = empireNeighborhoods.find(item => Number(item.id) === id);
-      if (!neighborhood) return;
-      state.empire.world.neighborhoodId = neighborhood.id;
-      state.empire.world.neighborhoodName = neighborhood.name;
-      save();
-      renderEmpireSetup();
-    }
+      render();
+
   });
 
   tabContent.addEventListener('keydown', (e) => {
