@@ -55,11 +55,10 @@ let remoteSaveTimer = null;
 let remoteSaveQueue = Promise.resolve();
 
 function isValidSave(parsed) {
-  // Realtime Database boş dizileri null olarak döndürebilir.
-  // Bu nedenle batches alanının null olması geçerli kayıt sayılır.
-  return parsed && typeof parsed.money === "number" &&
-    (Array.isArray(parsed.batches) || parsed.batches === null ||
-     (parsed.batches && typeof parsed.batches === "object"));
+  // Eski Firebase kayıtlarında batches alanı hiç bulunmayabilir.
+  // Para alanı sayısalsa kayıt geçerlidir; eksik alanlar normalize edilir.
+  return parsed && typeof parsed === "object" &&
+    !Array.isArray(parsed) && typeof parsed.money === "number";
 }
 
 function applySave(parsed) {
