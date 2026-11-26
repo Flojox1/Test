@@ -55,12 +55,23 @@ let remoteSaveTimer = null;
 let remoteSaveQueue = Promise.resolve();
 
 function isValidSave(parsed) {
-  return parsed && typeof parsed.money === "number" && Array.isArray(parsed.batches);
+  // Realtime Database boş dizileri null olarak döndürebilir.
+  // Bu nedenle batches alanının null olması geçerli kayıt sayılır.
+  return parsed && typeof parsed.money === "number" &&
+    (Array.isArray(parsed.batches) || parsed.batches === null ||
+     (parsed.batches && typeof parsed.batches === "object"));
 }
 
 function applySave(parsed) {
   Object.keys(state).forEach(k => delete state[k]);
   Object.assign(state, parsed);
+
+  // Firebase RTDB dizileri bazen sayısal anahtarlı nesne olarak döndürebilir.
+  if (!Array.isArray(state.batches)) {
+    state.batches = state.batches && typeof state.batches === "object"
+      ? Object.keys(state.batches).sort((a, b) => Number(a) - Number(b)).map(k => state.batches[k])
+      : [];
+  }
   normalizeState();
 }
 
