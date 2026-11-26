@@ -194,8 +194,16 @@ export async function load(uid) {
   const cloudSave = await response.json();
 
   if (isValidSave(cloudSave)) {
+    // Buluttaki kayıt her zaman önceliklidir.
     applySave(cloudSave);
   } else {
+    // Firebase'de bir kayıt VAR ama biçimi tanınmıyorsa,
+    // cihazdaki boş/yeni oyunla üzerine yazmayı kesinlikle engelle.
+    if (cloudSave !== null) {
+      activeSaveUid = null;
+      throw new Error("Bulut kaydı bulundu ancak okunamadı. Mevcut kayıt korunuyor; hiçbir şeyin üzerine yazılmadı.");
+    }
+
     const localKey = `${SAVE_KEY}_${uid}`;
     let parsed = null;
 
@@ -215,6 +223,7 @@ export async function load(uid) {
       refreshMarket();
     }
 
+    // Yalnızca bulutta hiç kayıt yoksa ilk kayıt oluşturulur.
     save();
   }
 
