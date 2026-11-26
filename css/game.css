@@ -516,3 +516,85 @@ body {
   .slot-grid { grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:8px; }
   .slot-phase { font-size:0.58rem; }
            }
+
+/* ===== ARSA LİSTESİ (Üretim) ===== */
+.plot-list { display:flex; flex-direction:column; gap:10px; }
+.plot-group { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; }
+.plot-group.open { border-color:var(--green); }
+.plot-head {
+  display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer;
+  -webkit-tap-highlight-color:transparent; user-select:none;
+}
+.plot-head:hover { background:var(--surface-2); }
+.plot-head .plate, .pp-head .plate {
+  flex-shrink:0; min-width:30px; text-align:center; padding:4px 6px; border-radius:4px;
+  background:var(--surface-2); border:1px solid var(--border); color:var(--gold);
+  font-family:var(--font-head); font-size:0.72rem; font-weight:700;
+}
+.plot-head .pinfo { flex:1; min-width:0; }
+.plot-head .pinfo h3 { font-family:var(--font-head); font-size:0.95rem; font-weight:700; }
+.plot-head .psub { font-size:0.64rem; color:var(--muted); letter-spacing:0.5px; margin-top:2px; }
+.plot-head .chev { color:var(--green-bright); font-size:0.9rem; flex-shrink:0; }
+.plot-body { padding:0 12px 12px; }
+
+/* ===== ARSALAR SEKMESİ (HARİTA) ===== */
+.arsa-wrap { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; align-items:start; }
+.map-box { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px; min-width:0; }
+.map-tools { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.map-tools .setting-select { flex:1; min-width:0; }
+.map-tools .zoom { display:flex; gap:4px; flex-shrink:0; }
+.map-tools .zoom .btn { padding:7px 11px; font-size:0.85rem; line-height:1; }
+.tr-map {
+  display:block; width:100%; height:auto; aspect-ratio:1000 / 422;
+  background:var(--bg); border-radius:6px; touch-action:none; cursor:grab;
+  -webkit-user-select:none; user-select:none;
+}
+.tr-map:active { cursor:grabbing; }
+.prov {
+  fill:var(--surface-2); stroke:#3a4534; stroke-width:0.8; vector-effect:non-scaling-stroke;
+  stroke-linejoin:round; cursor:pointer; transition:fill 0.15s;
+}
+.prov:hover { fill:#2c3828; }
+.prov.owned { fill:var(--green); stroke:#9ed06a; }
+.prov.owned:hover { fill:var(--green-bright); }
+.prov.sel { stroke:var(--gold); stroke-width:2.2; fill:#4a4520; }
+.prov.owned.sel { fill:#7fa83f; }
+.map-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; font-size:0.62rem; color:var(--muted); letter-spacing:0.5px; }
+.map-legend .dot { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; background:var(--surface-2); border:1px solid #3a4534; }
+.map-legend .dot.owned { background:var(--green); border-color:#9ed06a; }
+.map-legend .dot.sel { background:#4a4520; border-color:var(--gold); }
+
+/* Sağdaki arsa paneli (dar ekranda haritanın altında açılır) */
+.plot-panel {
+  background:var(--surface); border:1px solid var(--green); border-radius:8px; padding:14px;
+  animation:panelIn 0.18s ease-out;
+}
+@keyframes panelIn { from { opacity:0; transform:translateX(12px); } to { opacity:1; transform:none; } }
+.pp-head { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.pp-head h3 { flex:1; font-family:var(--font-head); font-size:1.05rem; font-weight:700; }
+.pp-head .x-btn {
+  width:30px; height:30px; flex-shrink:0; background:transparent; color:var(--muted);
+  border:1px solid var(--border); border-radius:4px; font-size:1.1rem; cursor:pointer;
+}
+.pp-head .x-btn:hover { color:var(--danger-bright); border-color:var(--danger); }
+.pp-badge {
+  display:inline-block; padding:3px 9px; border-radius:20px; margin-bottom:12px;
+  font-size:0.6rem; font-weight:700; letter-spacing:1px; text-transform:uppercase;
+  background:var(--surface-2); color:var(--gold); border:1px solid var(--border);
+}
+.pp-badge.owned { color:var(--green-bright); border-color:var(--green); }
+.pp-rows { margin-bottom:14px; }
+.pp-rows .row {
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+  padding:8px 0; border-bottom:1px solid var(--border); font-size:0.7rem;
+}
+.pp-rows .row:last-child { border-bottom:none; }
+.pp-rows .row .k { color:var(--muted); }
+.pp-rows .row .v { font-family:var(--font-head); font-weight:700; text-align:right; }
+.pp-rows .row .v.gold { color:var(--gold); }
+.pp-rows .row .v.green { color:var(--green-bright); }
+.pp-btn { width:100%; }
+
+@media (min-width:760px) {
+  .arsa-wrap.has-sel { grid-template-columns:minmax(0,1fr) 300px; }
+}

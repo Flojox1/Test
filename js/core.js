@@ -5,6 +5,7 @@ import {
   STAR_SPEED, STAR_SALARY, MASTER_TYPES,
   MALE_NAMES, SURNAMES
 } from './data.js';
+import { START_PLOT, getProvince } from './plots.js';
 
 /* ---------- YARDIMCI: BOŞ DURUM ---------- */
 function freshInventory() {
@@ -31,7 +32,8 @@ function makeFreshState() {
     inventory: freshInventory(),   // malzemeler (+ mushroom = toplam kg, stok ile senkron)
     stock: freshStock(),           // türe göre mantar stoku (kg)
     batches: [],
-    containers: [{ id: 1, level: 1 }],
+    plots: [{ id: START_PLOT }],   // sahip olunan arsalar (id = il plaka kodu)
+    containers: [{ id: 1, level: 1, plotId: START_PLOT }],
     masters: [],
     availableMasters: [],
     masterRestart: 'stop',
@@ -72,6 +74,16 @@ function normalizeState() {
 
   if (!state.cart) state.cart = {};
   if (!Array.isArray(state.containers) || !state.containers.length) state.containers = [{ id: 1, level: 1 }];
+
+  // Arsalar: eski kayıtlarda yoktu. Konteynerler Aksaray'a bağlanır.
+  if (!Array.isArray(state.plots)) state.plots = [];
+  state.plots = state.plots.filter(p => p && getProvince(p.id));
+  state.containers.forEach(c => {
+    if (!c.plotId || !getProvince(c.plotId)) c.plotId = START_PLOT;
+    if (!state.plots.some(p => p.id === c.plotId)) state.plots.push({ id: c.plotId });
+  });
+  if (!state.plots.length) state.plots = [{ id: START_PLOT }];
+
   if (!Array.isArray(state.masters)) state.masters = [];
   if (!Array.isArray(state.availableMasters)) state.availableMasters = [];
   if (!state.masterRestart) state.masterRestart = 'stop';
@@ -212,6 +224,14 @@ export function sellFromStock(amount) {
   syncMushroomTotal();
   state.money += revenue;
   return revenue;
+}
+
+/* ---------- ARSA ---------- */
+export function ownsPlot(plate) {
+  return state.plots.some(p => p.id === Number(plate));
+}
+export function plotContainers(plate) {
+  return state.containers.filter(c => c.plotId === Number(plate));
 }
 
 /* ---------- KONTEYNER / HESAP ---------- */

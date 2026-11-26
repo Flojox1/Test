@@ -8,7 +8,7 @@ export const SAVE_KEY = 'florod_mushroom_v6';
 export const START_MONEY = 25000;
 export const BATCH_WEIGHT = 10;          // bir parti = 10 kg substrat
 export const SPAWN_PER_BATCH = 0.3;      // parti başına misel (kg) ≈ %3
-export const MAX_CONTAINERS = 5;
+// Bir arsadaki en fazla konteyner sayısı artık o ilin ilçe sayısıdır (plots.js)
 export const NEW_CONTAINER_COST = 30000;
 
 /* ---------- MALZEMELER ---------- */

@@ -9,14 +9,18 @@ import {
   computeDuration, currentContamRisk, getSpeedMultiplier,
   advanceOffline,
   addMushroom, sellFromStock, getTypeSalePrice, getTypeBasePrice,
-  climateYieldMult, estimateContamRisk
+  climateYieldMult, estimateContamRisk,
+  ownsPlot, plotContainers
 } from './core.js';
 
 import {
   MATERIALS, RECIPE, MUSHROOM_TYPES, METHODS, PHASES, CONTAINER_LEVELS,
-  MAX_CONTAINERS, NEW_CONTAINER_COST, BATCH_WEIGHT,
+  NEW_CONTAINER_COST, BATCH_WEIGHT,
   MASTER_TYPES, STAR_SPEED, RESTART_MODES
 } from './data.js';
+
+import { PROVINCES, MAP_VIEWBOX } from './provinces.js';
+import { getProvince, plotPrice } from './plots.js';
 
 import { initChat } from './chat.js';
 
@@ -24,6 +28,10 @@ let activeTab = 'uretim';
 let logicInterval = null;
 let uretimView = 'list';
 let viewingContainerId = null;
+const expandedPlots = new Set();   // Üretim'de açık olan arsalar (plaka)
+let selectedPlate = null;          // Arsalar sekmesinde seçili il
+
+const tl = n => '₺' + Math.round(n).toLocaleString('tr-TR');
 
 const tabContent = document.getElementById('tabContent');
 const modalBack = document.getElementById('modalBack');
@@ -356,14 +364,41 @@ export function doUpgrade(containerId) {
   render(); save();
 }
 
-export function buyNewContainer() {
-  if (state.containers.length >= MAX_CONTAINERS) { alert('Maksimum konteyner sayısı.'); return; }
+export function buyNewContainer(plotId) {
+  const prov = getProvince(plotId);
+  if (!prov || !ownsPlot(plotId)) return;
+  if (plotContainers(plotId).length >= prov.districts) {
+    alert(`${prov.name} arsasında en fazla ${prov.districts} konteyner açılabilir.`);
+    return;
+  }
   if (state.money < NEW_CONTAINER_COST) { alert('Para yetersiz.'); return; }
-  if (!confirm(`Yeni konteyner için ${fmtMoney(NEW_CONTAINER_COST)} ödenecek.`)) return;
+  if (!confirm(`${prov.name} arsasına yeni konteyner için ${fmtMoney(NEW_CONTAINER_COST)} ödenecek.`)) return;
   state.money -= NEW_CONTAINER_COST;
   const newId = Math.max(...state.containers.map(c => c.id), 0) + 1;
-  state.containers.push({ id: newId, level: 1 });
+  state.containers.push({ id: newId, level: 1, plotId: prov.plate });
+  expandedPlots.add(prov.plate);
   render(); save();
+}
+
+/* ---------- ARSA ---------- */
+export function buyPlot(plate) {
+  const prov = getProvince(plate);
+  if (!prov || ownsPlot(plate)) return;
+  const price = plotPrice(prov);
+  if (state.money < price) { alert('Para yetersiz. ' + prov.name + ' arsası: ' + tl(price)); return; }
+  if (!confirm(`${prov.name} arsası için ${tl(price)} ödenecek.`)) return;
+  state.money -= price;
+  state.plots.push({ id: prov.plate });
+  render(); save();
+}
+
+function goToProduction(plate) {
+  expandedPlots.add(Number(plate));
+  uretimView = 'list';
+  viewingContainerId = null;
+  activeTab = 'uretim';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'uretim'));
+  render();
 }
 
 /* ---------- RENDER ---------- */
@@ -374,6 +409,7 @@ export function renderHUD() {
   moneyEl.classList.toggle('gold', state.money >= 0);
   document.getElementById('statDay').textContent = state.day;
   document.getElementById('statPrice').textContent = '₺' + Math.round(getMushroomSalePrice()) + '/kg';
+  document.getElementById('statPlot').textContent = state.plots.length;
   document.getElementById('statContainer').textContent = state.containers.length;
   document.querySelectorAll('.speed-btn').forEach(btn => {
     btn.classList.toggle('active', parseInt(btn.dataset.speed) === state.speed);
@@ -383,11 +419,13 @@ export function renderHUD() {
 export function render() {
   renderHUD();
   if (activeTab === 'uretim') renderUretim();
+  else if (activeTab === 'arsalar') renderArsalar();
   else if (activeTab === 'pazar') renderPazar();
   else if (activeTab === 'ustalar') renderUstalar();
   else if (activeTab === 'depo') renderDepo();
 }
 
+// Not: Arsalar sekmesi canlı yenilenmez (harita her saniye yeniden çizilmesin diye).
 export function renderLive() {
   renderHUD();
   if (activeTab === 'uretim') {
@@ -446,38 +484,62 @@ function renderContainerList() {
   `;
 
   const totCap = state.containers.reduce((s, c) => s + CONTAINER_LEVELS[c.level].capacity, 0);
-  html += `<div class="hint">Toplam substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b></div>`;
+  html += `<div class="hint">Toplam substrat: <b>${totalActiveSubstrate()} / ${totCap} kg</b> · Depo: <b>${storageUsed().toFixed(1)} / ${totalStorageCap()} kg</b> · Bir arsanın adına dokununca içindeki konteynerler açılır.</div>`;
 
-  html += `<div class="container-list">`;
-  state.containers.forEach(c => {
-    const lvl = CONTAINER_LEVELS[c.level];
-    const active = activeSubstrateIn(c.id);
-    const pct = Math.min(100, (active / lvl.capacity) * 100);
-    const slotCount = Math.floor(lvl.capacity / BATCH_WEIGHT);
-    const usedSlots = Math.floor(active / BATCH_WEIGHT);
+  html += `<div class="plot-list">`;
+  state.plots.forEach(pl => {
+    const prov = getProvince(pl.id);
+    if (!prov) return;
+    const conts = plotContainers(pl.id);
+    const open = expandedPlots.has(pl.id);
     html += `
-      <div class="container-list-item" data-action="openContainer" data-id="${c.id}">
-        <div class="head">
-          <h3>Konteyner #${c.id}</h3>
-          <span class="sv">Sv.${c.level}</span>
+      <div class="plot-group ${open ? 'open' : ''}">
+        <div class="plot-head" data-action="togglePlot" data-plot="${pl.id}">
+          <span class="plate">${String(prov.plate).padStart(2, '0')}</span>
+          <div class="pinfo">
+            <h3>${prov.name}</h3>
+            <div class="psub">${conts.length}/${prov.districts} konteyner</div>
+          </div>
+          <span class="chev">${open ? '▾' : '▸'}</span>
         </div>
-        <div class="name">${lvl.name}</div>
-        <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
-        <div class="bar-info">
-          <span>${active}/${lvl.capacity} kg</span>
-          <span>${usedSlots}/${slotCount} slot</span>
-        </div>
-      </div>
     `;
+    if (open) {
+      html += `<div class="plot-body container-list">`;
+      conts.forEach(c => {
+        const lvl = CONTAINER_LEVELS[c.level];
+        const active = activeSubstrateIn(c.id);
+        const pct = Math.min(100, (active / lvl.capacity) * 100);
+        const slotCount = Math.floor(lvl.capacity / BATCH_WEIGHT);
+        const usedSlots = Math.floor(active / BATCH_WEIGHT);
+        html += `
+          <div class="container-list-item" data-action="openContainer" data-id="${c.id}">
+            <div class="head">
+              <h3>Konteyner #${c.id}</h3>
+              <span class="sv">Sv.${c.level}</span>
+            </div>
+            <div class="name">${lvl.name}</div>
+            <div class="bar"><div class="fill" style="width:${pct}%"></div></div>
+            <div class="bar-info">
+              <span>${active}/${lvl.capacity} kg</span>
+              <span>${usedSlots}/${slotCount} slot</span>
+            </div>
+          </div>
+        `;
+      });
+      if (conts.length < prov.districts) {
+        html += `
+          <div class="container-list-item add" data-action="buyContainer" data-plot="${pl.id}">
+            <h3>+ Yeni Konteyner</h3>
+            <div class="price">${fmtMoney(NEW_CONTAINER_COST)}</div>
+          </div>
+        `;
+      } else {
+        html += `<div class="hint">${prov.name} arsası dolu (${prov.districts} ilçe = ${prov.districts} konteyner).</div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
   });
-  if (state.containers.length < MAX_CONTAINERS) {
-    html += `
-      <div class="container-list-item add" data-action="buyContainer">
-        <h3>+ Yeni Konteyner</h3>
-        <div class="price">${fmtMoney(NEW_CONTAINER_COST)}</div>
-      </div>
-    `;
-  }
   html += `</div>`;
   tabContent.innerHTML = html;
 }
@@ -497,7 +559,7 @@ function renderContainerView(cont) {
         <button class="x-btn" data-action="exitContainer" aria-label="Geri">×</button>
         <div class="title-block">
           <h3>Konteyner #${cont.id}</h3>
-          <div class="name">${lvl.name} · Sv.${cont.level}</div>
+          <div class="name">${getProvince(cont.plotId)?.name || ''} · ${lvl.name} · Sv.${cont.level}</div>
         </div>
       </div>
       ${next ? `<button class="btn btn-green" data-action="openUpgrade" data-id="${cont.id}">Yükselt</button>` : ''}
@@ -550,6 +612,166 @@ function renderContainerView(cont) {
     html += `</div>`;
   }
   tabContent.innerHTML = html;
+}
+
+/* ---------- ARSALAR (TÜRKİYE HARİTASI) ---------- */
+const MAP_DIM = MAP_VIEWBOX.split(' ').map(Number);
+const MAP_W = MAP_DIM[2];
+const MAP_H = MAP_DIM[3];
+const mapView = { x: 0, y: 0, w: MAP_W };   // yakınlaştırma / kaydırma durumu
+let mapDragged = false;                      // sürükleme sonrası yanlışlıkla il seçilmesin
+
+function mapViewBox() {
+  const h = mapView.w * MAP_H / MAP_W;
+  return `${mapView.x.toFixed(1)} ${mapView.y.toFixed(1)} ${mapView.w.toFixed(1)} ${h.toFixed(1)}`;
+}
+function clampMapView() {
+  mapView.w = Math.min(MAP_W, Math.max(MAP_W / 10, mapView.w));
+  const h = mapView.w * MAP_H / MAP_W;
+  mapView.x = Math.min(MAP_W - mapView.w, Math.max(0, mapView.x));
+  mapView.y = Math.min(MAP_H - h, Math.max(0, mapView.y));
+}
+// fx, fy: yakınlaştırma noktasının harita üzerindeki oranı (0..1)
+function zoomMap(svg, factor, fx = 0.5, fy = 0.5) {
+  const h = mapView.w * MAP_H / MAP_W;
+  const px = mapView.x + mapView.w * fx;
+  const py = mapView.y + h * fy;
+  mapView.w = mapView.w / factor;
+  clampMapView();
+  const nh = mapView.w * MAP_H / MAP_W;
+  mapView.x = px - mapView.w * fx;
+  mapView.y = py - nh * fy;
+  clampMapView();
+  svg.setAttribute('viewBox', mapViewBox());
+}
+
+function setupMapInteractions(svg) {
+  const pointers = new Map();
+  let startDist = 0;
+
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const r = svg.getBoundingClientRect();
+    zoomMap(svg, e.deltaY < 0 ? 1.25 : 0.8, (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+  }, { passive: false });
+
+  svg.addEventListener('pointerdown', e => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
+    mapDragged = false;
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      startDist = Math.hypot(a.x - b.x, a.y - b.y);
+    }
+  });
+
+  svg.addEventListener('pointermove', e => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    const r = svg.getBoundingClientRect();
+    if (pointers.size === 1) {
+      if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > 6) mapDragged = true;
+      if (mapDragged) {
+        const k = mapView.w / r.width;
+        mapView.x -= (e.clientX - p.x) * k;
+        mapView.y -= (e.clientY - p.y) * k;
+        clampMapView();
+        svg.setAttribute('viewBox', mapViewBox());
+      }
+      p.x = e.clientX; p.y = e.clientY;
+    } else if (pointers.size === 2) {
+      p.x = e.clientX; p.y = e.clientY;
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (startDist > 0 && d > 0) {
+        mapDragged = true;
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        zoomMap(svg, d / startDist, (mx - r.left) / r.width, (my - r.top) / r.height);
+        startDist = d;
+      }
+    }
+  });
+
+  const end = e => { pointers.delete(e.pointerId); startDist = 0; };
+  svg.addEventListener('pointerup', end);
+  svg.addEventListener('pointercancel', end);
+  svg.addEventListener('pointerleave', end);
+}
+
+function plotPanelHtml(p) {
+  const owned = ownsPlot(p.plate);
+  const price = plotPrice(p);
+  const have = plotContainers(p.plate).length;
+  const canBuy = state.money >= price;
+  return `
+    <aside class="plot-panel" id="plotPanel">
+      <div class="pp-head">
+        <span class="plate">${String(p.plate).padStart(2, '0')}</span>
+        <h3>${p.name}</h3>
+        <button class="x-btn" data-action="closePanel" aria-label="Kapat">×</button>
+      </div>
+      <div class="pp-badge ${owned ? 'owned' : ''}">${owned ? '✔ Bu arsa senin' : 'Satılık arsa'}</div>
+      <div class="pp-rows">
+        <div class="row"><span class="k">Arsa fiyatı</span><span class="v gold">${owned ? 'Satın alındı' : tl(price)}</span></div>
+        <div class="row"><span class="k">Açılabilecek konteyner</span><span class="v green">${p.districts}</span></div>
+        <div class="row"><span class="k">İlçe sayısı</span><span class="v">${p.districts}</span></div>
+        <div class="row"><span class="k">Nüfus (yaklaşık)</span><span class="v">${(p.pop * 1000).toLocaleString('tr-TR')}</span></div>
+        <div class="row"><span class="k">Konteyner maliyeti</span><span class="v">${tl(NEW_CONTAINER_COST)} / adet</span></div>
+        ${owned ? `<div class="row"><span class="k">Açılan konteyner</span><span class="v green">${have}/${p.districts}</span></div>` : ''}
+      </div>
+      ${owned
+        ? `<button class="btn btn-green pp-btn" data-action="goPlot" data-plate="${p.plate}">Üretime Git</button>`
+        : `<button class="btn btn-green pp-btn" data-action="buyPlot" data-plate="${p.plate}" ${canBuy ? '' : 'disabled'}>${canBuy ? 'Satın Al · ' : 'Para Yetersiz · '}${tl(price)}</button>`}
+    </aside>
+  `;
+}
+
+export function renderArsalar() {
+  const sel = selectedPlate != null ? getProvince(selectedPlate) : null;
+  const paths = [];
+  let selPath = '';   // seçili il en üstte çizilsin (kenar çizgisi komşular altında kalmasın)
+  PROVINCES.forEach(p => {
+    const owned = ownsPlot(p.plate);
+    const isSel = !!sel && sel.plate === p.plate;
+    const label = `${p.name} · ${owned ? 'Senin' : tl(plotPrice(p))} · ${p.districts} konteyner`;
+    const el = `<path class="prov${owned ? ' owned' : ''}${isSel ? ' sel' : ''}" data-action="selectProvince" data-plate="${p.plate}" d="${p.path}"><title>${label}</title></path>`;
+    if (isSel) selPath = el; else paths.push(el);
+  });
+
+  const options = [...PROVINCES]
+    .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+    .map(p => `<option value="${p.plate}"${sel && sel.plate === p.plate ? ' selected' : ''}>${p.name}</option>`)
+    .join('');
+
+  tabContent.innerHTML = `
+    <div class="section-head"><h2>Arsalar · Türkiye</h2></div>
+    <div class="hint">Bir ile dokun: arsa fiyatını ve kaç konteyner açabileceğini gör. Bir arsada <b>ilçe sayısı kadar</b> konteyner açılır. Başlangıç arsan <b>Aksaray</b>.</div>
+    <div class="arsa-wrap ${sel ? 'has-sel' : ''}">
+      <div class="map-box">
+        <div class="map-tools">
+          <select class="setting-select" id="provSelect"><option value="">İl seç…</option>${options}</select>
+          <div class="zoom">
+            <button class="btn btn-ghost" data-action="mapZoomIn" aria-label="Yakınlaştır">+</button>
+            <button class="btn btn-ghost" data-action="mapZoomOut" aria-label="Uzaklaştır">−</button>
+            <button class="btn btn-ghost" data-action="mapReset" aria-label="Haritayı sıfırla">⟲</button>
+          </div>
+        </div>
+        <svg id="trMap" class="tr-map" viewBox="${mapViewBox()}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Türkiye haritası">${paths.join('')}${selPath}</svg>
+        <div class="map-legend">
+          <span><i class="dot owned"></i>Senin</span>
+          <span><i class="dot"></i>Satılık</span>
+          <span><i class="dot sel"></i>Seçili</span>
+        </div>
+      </div>
+      ${sel ? plotPanelHtml(sel) : ''}
+    </div>
+  `;
+
+  setupMapInteractions(document.getElementById('trMap'));
+  document.getElementById('provSelect').addEventListener('change', e => {
+    if (!e.target.value) return;
+    selectedPlate = parseInt(e.target.value);
+    renderArsalar();
+  });
 }
 
 /* ---------- PAZAR ---------- */
@@ -977,7 +1199,23 @@ export function setupEvents() {
     else if (a === 'openUpgrade') openUpgradeModal(parseInt(btn.dataset.id));
     else if (a === 'openBatch') openBatchModal(parseFloat(btn.dataset.id));
     else if (a === 'newBatchIn') openNewBatchModal(parseInt(btn.dataset.container));
-    else if (a === 'buyContainer') buyNewContainer();
+    else if (a === 'buyContainer') buyNewContainer(parseInt(btn.dataset.plot));
+    else if (a === 'togglePlot') {
+      const plate = parseInt(btn.dataset.plot);
+      if (expandedPlots.has(plate)) expandedPlots.delete(plate); else expandedPlots.add(plate);
+      renderUretim();
+    }
+    else if (a === 'selectProvince') {
+      if (mapDragged) { mapDragged = false; return; }   // sürükleme, tıklama değil
+      selectedPlate = parseInt(btn.dataset.plate);
+      renderArsalar();
+    }
+    else if (a === 'closePanel') { selectedPlate = null; renderArsalar(); }
+    else if (a === 'buyPlot') buyPlot(parseInt(btn.dataset.plate));
+    else if (a === 'goPlot') goToProduction(parseInt(btn.dataset.plate));
+    else if (a === 'mapZoomIn')  zoomMap(tabContent.querySelector('#trMap'), 1.5);
+    else if (a === 'mapZoomOut') zoomMap(tabContent.querySelector('#trMap'), 1 / 1.5);
+    else if (a === 'mapReset') { mapView.x = 0; mapView.y = 0; mapView.w = MAP_W; renderArsalar(); }
     else if (a === 'skipDay') { for (let i = 0; i < 12; i++) advanceState(); render(); save(); }
     else if (a === 'sell') sellMushrooms(btn.dataset.qty === 'all' ? 'all' : parseInt(btn.dataset.qty));
     else if (a === 'remove') removeBatch(parseFloat(btn.dataset.id));
@@ -1031,6 +1269,9 @@ export function setupEvents() {
     resetState();
     uretimView = 'list';
     viewingContainerId = null;
+    expandedPlots.clear();
+    selectedPlate = null;
+    mapView.x = 0; mapView.y = 0; mapView.w = MAP_W;
     render();
   });
 }
