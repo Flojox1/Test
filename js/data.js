@@ -150,10 +150,10 @@ export const BATCH_YIELD_AVG = BATCH_YIELD_TOTAL / MUSHROOM_TYPES.oyster.flushYi
 export const CONTAINER_LEVELS = [
   null,
   { name:'20ft Temel Konteyner', capacity:50,  storage:100,  climate:0.35, priceBonus:0,    cost:0 },
-  { name:'Yalıtım + 4 Kat Raf',  capacity:150, storage:300,  climate:0.50, priceBonus:0,    cost:12000 },
-  { name:'İklimlendirme (AC+Nem+Fan)', capacity:150, storage:300, climate:0.72, priceBonus:0, cost:30000 },
-  { name:'HEPA + Otomasyon',     capacity:250, storage:500,  climate:0.88, priceBonus:0,    cost:65000 },
-  { name:'Soğuk Hava + Otomasyon', capacity:500, storage:1000, climate:0.95, priceBonus:0.10, cost:140000 }
+  { name:'Yalıtım + 4 Kat Raf',  capacity:150, storage:300,  climate:0.50, priceBonus:0,    cost:45000 },
+  { name:'İklimlendirme (AC+Nem+Fan)', capacity:150, storage:300, climate:0.72, priceBonus:0, cost:125000 },
+  { name:'HEPA + Otomasyon',     capacity:250, storage:500,  climate:0.88, priceBonus:0,    cost:350000 },
+  { name:'Soğuk Hava + Otomasyon', capacity:500, storage:1000, climate:0.95, priceBonus:0.10, cost:900000 }
 ];
 
 /* ---------- USTALAR ---------- */
