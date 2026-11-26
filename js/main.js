@@ -1,5 +1,6 @@
 import { requireVerifiedUser } from './auth.js';
 import { init } from './game.js';
+import { getFirebaseApp } from './firebase.js';
 
 try {
   const user = await requireVerifiedUser();
@@ -7,6 +8,22 @@ try {
     window.location.replace('index.html');
   } else {
     document.documentElement.dataset.accountEmail = user.email || '';
+    const app = await getFirebaseApp();
+    const { getDatabase, ref, get, set } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js');
+    const db = getDatabase(app);
+    const profileRef = ref(db, `users/${user.uid}/profile`);
+    const profileSnap = await get(profileRef);
+    if (!profileSnap.exists() || !profileSnap.val()?.name) {
+      let playerName = '';
+      while (!playerName) {
+        const entered = prompt('Oyuna hoş geldin! Kullanacağın oyuncu adını seç (2-20 karakter):');
+        if (entered === null) { await (await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js')).signOut(await (await import('./firebase.js')).getFirebaseAuth()); window.location.replace('index.html'); throw new Error('İsim seçimi iptal edildi.'); }
+        const cleaned = entered.trim().replace(/\\s+/g, ' ').slice(0, 20);
+        if (cleaned.length >= 2) playerName = cleaned;
+        else alert('İsim en az 2 karakter olmalı.');
+      }
+      await set(profileRef, { name: playerName, createdAt: Date.now() });
+    }
     await init(user.uid);
   }
 } catch (error) {
