@@ -1,4 +1,4 @@
-import { requireVerifiedUser } from './auth.js';
+import { requireVerifiedUser, changeAccountPassword } from './auth.js';
 import { init } from './game.js';
 import { getFirebaseApp, getFirebaseAuth } from './firebase.js';
 
@@ -63,6 +63,52 @@ try {
       profileBack.setAttribute('aria-hidden', 'false');
     });
     document.getElementById('profileClose').addEventListener('click', closeProfile);
+
+    const passwordForm = document.getElementById('changePasswordForm');
+    passwordForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const currentPassword = document.getElementById('currentAccountPassword').value;
+      const newPassword = document.getElementById('newAccountPassword').value;
+      const confirmPassword = document.getElementById('confirmAccountPassword').value;
+      const status = document.getElementById('changePasswordStatus');
+      const button = document.getElementById('changePasswordSubmit');
+      status.textContent = '';
+      status.classList.remove('error');
+      if (newPassword.length < 6) {
+        status.textContent = 'Yeni şifre en az 6 karakter olmalı.';
+        status.classList.add('error');
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        status.textContent = 'Yeni şifreler eşleşmiyor.';
+        status.classList.add('error');
+        return;
+      }
+      if (currentPassword === newPassword) {
+        status.textContent = 'Yeni şifren mevcut şifrenle aynı olamaz.';
+        status.classList.add('error');
+        return;
+      }
+      button.disabled = true;
+      button.textContent = 'GÜNCELLENİYOR...';
+      try {
+        await changeAccountPassword(currentPassword, newPassword);
+        passwordForm.reset();
+        status.textContent = 'Şifren başarıyla güncellendi.';
+      } catch (error) {
+        const messages = {
+          'auth/wrong-password': 'Mevcut şifren hatalı.',
+          'auth/invalid-credential': 'Mevcut şifren hatalı.',
+          'auth/weak-password': 'Yeni şifre yeterince güçlü değil.',
+          'auth/requires-recent-login': 'Güvenlik nedeniyle çıkış yapıp tekrar giriş yapmalısın.'
+        };
+        status.textContent = messages[error.code] || error.message || 'Şifre güncellenemedi.';
+        status.classList.add('error');
+      } finally {
+        button.disabled = false;
+        button.textContent = 'ŞİFREYİ GÜNCELLE';
+      }
+    });
     document.getElementById('playerLogout').addEventListener('click', async () => { if (!confirm('Hesabından çıkış yapmak istiyor musun?')) return; const auth = await getFirebaseAuth(); const { signOut } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js'); await signOut(auth); window.location.replace('index.html'); });
     profileBack.addEventListener('click', event => {
       if (event.target === profileBack) closeProfile();
