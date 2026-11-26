@@ -192,7 +192,15 @@ async function handleVerifyCode(request, env) {
 export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "*";
-    if (request.method === "OPTIONS") return json({}, 204, origin);
+    if (request.method === "OPTIONS") return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Vary": "Origin"
+      }
+    });
     if (request.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
     const url = new URL(request.url);
     try {
