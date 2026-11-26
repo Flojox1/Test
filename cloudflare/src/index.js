@@ -304,14 +304,15 @@ async function handleAdminApi(request, env, pathname) {
   }
   return json({ error: "Admin endpoint bulunamadı." }, 404);
 }
-\nexport default {
+
+export default {
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "*";
     if (request.method === "OPTIONS") return new Response(null, {
       status: 204,
       headers: {
         "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
         "Vary": "Origin"
       }
@@ -320,7 +321,9 @@ async function handleAdminApi(request, env, pathname) {
     if (request.method !== "POST" && !(request.method === "GET" && url.pathname.startsWith("/admin/"))) return json({ error: "Method not allowed" }, 405, origin);
     try {
       let response;
-      if (url.pathname === "/admin-login") response = await handleAdminLogin(request, env);\n      else if (url.pathname.startsWith("/admin/")) response = await handleAdminApi(request, env, url.pathname);\n      else if (url.pathname === "/send-code") response = await handleSendCode(request, env);
+      if (url.pathname === "/admin-login") response = await handleAdminLogin(request, env);
+      else if (url.pathname.startsWith("/admin/")) response = await handleAdminApi(request, env, url.pathname);
+      else if (url.pathname === "/send-code") response = await handleSendCode(request, env);
       else if (url.pathname === "/verify-code") response = await handleVerifyCode(request, env);
       else response = json({ error: "Not found" }, 404, origin);
       const headers = new Headers(response.headers);
