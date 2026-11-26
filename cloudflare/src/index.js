@@ -223,8 +223,13 @@ async function dbRequest(path, env, method = "GET", value) {
     method, headers: { "Content-Type": "application/json" },
     ...(method === "GET" || method === "DELETE" ? {} : { body: JSON.stringify(value) })
   });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error("Firebase veritabanı işlemi başarısız.");
+  const rawBody = await response.text().catch(() => "");
+  let body = null;
+  try { body = rawBody ? JSON.parse(rawBody) : null; } catch { body = rawBody.slice(0, 500); }
+  if (!response.ok) {
+    const detail = typeof body === "string" ? body : (body?.error || body?.message || JSON.stringify(body));
+    throw new Error(`Firebase HTTP ${response.status}: ${String(detail || "Bilinmeyen veritabanı hatası").slice(0, 500)}`);
+  }
   return body;
 }
 
