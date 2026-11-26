@@ -32,10 +32,10 @@ async function verifyFirebaseToken(idToken, env) {
   });
   const body = await response.json().catch(() => ({}));
   const user = body.users?.[0];
-  if (!response.ok || !user?.localId || !user.email) {
+  if (!response.ok || !user?.localId) {
     throw new Error("Oturum geçersiz. Tekrar giriş yap.");
   }
-  return { uid: user.localId, email: user.email, emailVerified: !!user.emailVerified };
+  return { uid: user.localId, email: user.email || "", emailVerified: !!user.emailVerified };
 }
 
 function pemToArrayBuffer(pem) {
