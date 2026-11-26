@@ -257,7 +257,12 @@
         'auth/too-many-requests':'Çok fazla deneme yapıldı. Bir süre sonra tekrar dene.',
         'auth/operation-not-allowed':'Firebase Console’da Email/Password giriş yöntemini etkinleştir.'
       };
-      if (err.code === 'auth/email-not-verified') {\n        $('loginForm').hidden=true; $('registerForm').hidden=true;\n        $('loginTab').classList.remove('active'); $('registerTab').classList.remove('active');\n        $('verifyForm').hidden=false; mode='verify';\n        status('E-posta henüz doğrulanmamış. Gmail adresine yeni kod gönderebilirsin.',true);\n      } else { status(messages[err.code] || err.message || 'Giriş yapılamadı.',true); }
+      if (err.code === 'auth/email-not-verified') {
+        $('loginForm').hidden=true; $('registerForm').hidden=true;
+        $('loginTab').classList.remove('active'); $('registerTab').classList.remove('active');
+        $('verifyForm').hidden=false; mode='verify';
+        status('E-posta henüz doğrulanmamış. Gmail adresine yeni kod gönderebilirsin.',true);
+      } else { status(messages[err.code] || err.message || 'Giriş yapılamadı.',true); }
     } finally { busy(form,false); }
   });
   $('forgotPassword').addEventListener('click', async()=>{
