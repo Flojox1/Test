@@ -120,7 +120,12 @@ export function save() {
 function normalizeState() {
   if (!state.empire || typeof state.empire !== 'object') state.empire = createEmpireState();
   if (!state.empire.transitionOffer) state.empire.transitionOffer = { available: false, purchased: false, price: null };
-  if (!state.empire.world) state.empire.world = { cityId: null, districtId: null, propertyId: null };
+  if (!state.empire.world) state.empire.world = { cityId: null, cityName: null, districtId: null, districtName: null, neighborhoodId: null, neighborhoodName: null, propertyId: null, setupComplete: false };
+  if (typeof state.empire.world.setupComplete !== 'boolean') state.empire.world.setupComplete = !!(state.empire.world.cityId && state.empire.world.districtId && state.empire.world.neighborhoodId);
+  if (state.empire.world.cityName == null) state.empire.world.cityName = null;
+  if (state.empire.world.districtName == null) state.empire.world.districtName = null;
+  if (state.empire.world.neighborhoodId == null) state.empire.world.neighborhoodId = null;
+  if (state.empire.world.neighborhoodName == null) state.empire.world.neighborhoodName = null;
   if (!state.empire.estate) state.empire.estate = { cash: 0, bank: 0, properties: [], vehicles: [], businesses: [], otherAssets: [] };
   if (!state.empire.history) state.empire.history = { generation: 0, previousCharacters: [] };
   if (!state.inventory || typeof state.inventory !== 'object') state.inventory = {};
