@@ -36,8 +36,8 @@ function makeFreshState() {
     inventory: freshInventory(),   // malzemeler (+ mushroom = toplam kg, stok ile senkron)
     stock: freshStock(),           // türe göre mantar stoku (kg)
     batches: [],
-    plots: [{ id: START_PLOT }],   // sahip olunan arsalar (id = il plaka kodu)
-    containers: [{ id: 1, level: 1, plotId: START_PLOT }],
+    plots: [],   // İlk mantar döneminde gerçek arsa sahipliği yoktur.
+    containers: [{ id: 1, level: 1, plotId: START_PLOT }], // Başlangıç üretim alanı; satın alınmış arsa değildir.
     masters: [],
     availableMasters: [],
     masterRestart: 'stop',
@@ -141,14 +141,13 @@ function normalizeState() {
   if (!state.cart) state.cart = {};
   if (!Array.isArray(state.containers) || !state.containers.length) state.containers = [{ id: 1, level: 1 }];
 
-  // Arsalar: eski kayıtlarda yoktu. Konteynerler Aksaray'a bağlanır.
+  // Üretim konteynerleri bir başlangıç alanında bulunabilir; bu alan gerçek arsa
+  // sahipliği değildir. Konteyner var diye otomatik olarak arsa ekleme.
   if (!Array.isArray(state.plots)) state.plots = [];
   state.plots = state.plots.filter(p => p && getProvince(p.id));
   state.containers.forEach(c => {
     if (!c.plotId || !getProvince(c.plotId)) c.plotId = START_PLOT;
-    if (!state.plots.some(p => p.id === c.plotId)) state.plots.push({ id: c.plotId });
   });
-  if (!state.plots.length) state.plots = [{ id: START_PLOT }];
 
   if (!Array.isArray(state.masters)) state.masters = [];
   // Eski kayıtlardaki konteyner ataması olmayan ustaları ilk konteynere bağla.
