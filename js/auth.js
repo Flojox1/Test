@@ -45,13 +45,12 @@ export async function resendVerificationCode() {
 
 export async function loginWithEmail(email, password) {
   const auth = await getFirebaseAuth();
-  const { signInWithEmailAndPassword, signOut, reload } =
+  const { signInWithEmailAndPassword, reload } =
     await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
   const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
   await reload(credential.user);
   if (!credential.user.emailVerified) {
-    await signOut(auth);
-    const err = new Error('E-posta adresin henüz doğrulanmamış. Kayıt ekranından yeni kod iste.');
+    const err = new Error('E-posta adresin henüz doğrulanmamış. Aşağıdan doğrulama kodu iste.');
     err.code = 'auth/email-not-verified';
     throw err;
   }
