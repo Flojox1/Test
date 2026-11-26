@@ -439,8 +439,8 @@ export function contamRiskFor(typeKey, method, level, containerId) {
   const m = METHODS[method] || METHODS.hot;
   const climate = CONTAINER_LEVELS[level || 1].climate;
   const methodFit = (t.methodMult && t.methodMult[method]) || 1;
-  // Genel üretim riski biraz yükseltildi; yöntem, tür ve iklim farkları korunur.
-  let risk = m.risk * 1.25 * methodFit * t.contamMult * (1.3 - climate);
+  // Genel kontaminasyon riski azaltıldı; yöntem, tür ve iklim farkları korunur.
+  let risk = m.risk * 0.8 * methodFit * t.contamMult * (1.3 - climate);
   const master = state.masters.find(x =>
     x.type === 'inoculate' &&
     (containerId == null || Number(x.containerId) === Number(containerId))
