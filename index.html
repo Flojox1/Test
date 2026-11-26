@@ -61,7 +61,22 @@
     font-weight: 300; letter-spacing: 6px; text-transform: uppercase;
     color: var(--muted); animation: rise 0.9s 0.16s ease both;
   }
-  .play-wrap { margin-top: clamp(48px, 8vh, 84px); animation: rise 0.9s 0.28s ease both; }
+  .play-wrap { margin-top: clamp(28px, 5vh, 48px); animation: rise 0.9s 0.28s ease both; width:min(100%,390px); }
+  .auth-card { width:100%; padding:24px; text-align:left; background:rgba(16,16,20,.94); border:1px solid rgba(176,37,37,.28); box-shadow:0 20px 70px rgba(0,0,0,.42); backdrop-filter:blur(14px); }
+  .auth-tabs { display:flex; gap:8px; margin-bottom:18px; }
+  .auth-tab { flex:1; padding:11px; color:var(--muted); background:#17171d; border:1px solid var(--border); cursor:pointer; font:600 .72rem var(--font-body); letter-spacing:1px; }
+  .auth-tab.active { color:var(--text); border-color:var(--blood-bright); background:rgba(139,26,26,.22); }
+  .auth-form { display:grid; gap:10px; }
+  .auth-form[hidden] { display:none; }
+  .auth-form label { color:var(--muted); font-size:.65rem; letter-spacing:1px; text-transform:uppercase; text-align:left; }
+  .auth-form input { width:100%; padding:13px 14px; color:var(--text); background:#09090c; border:1px solid var(--border); outline:none; font: .9rem var(--font-body); }
+  .auth-form input:focus { border-color:var(--blood-bright); }
+  .auth-submit { margin-top:6px; width:100%; padding:14px; color:var(--text); background:var(--blood); border:1px solid rgba(176,37,37,.6); cursor:pointer; font:700 .8rem var(--font-head); letter-spacing:2px; }
+  .auth-submit:disabled { opacity:.55; cursor:wait; }
+  .auth-help { color:var(--muted); background:none; border:0; cursor:pointer; font:.7rem var(--font-body); padding:8px; }
+  .auth-status { min-height:34px; color:#d6c8a0; font-size:.72rem; line-height:1.5; text-align:center; margin-top:12px; overflow-wrap:anywhere; }
+  .auth-status.error { color:#ff8989; }
+  .auth-note { color:var(--muted); font-size:.65rem; line-height:1.5; text-align:center; margin-top:12px; }
   .play {
     position: relative; display: inline-flex; align-items: center; justify-content: center;
     gap: 14px; padding: 22px 64px;
@@ -119,9 +134,31 @@
   <h1 class="title">Flo<em>Rod</em></h1>
   <p class="subtitle">Çeliğin Ağırlığı</p>
   <div class="play-wrap">
-    <button class="play" id="playBtn" type="button">
-      Oyna <span class="arrow">›</span>
-    </button>
+    <section class="auth-card" aria-label="Oyuncu hesabı">
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="loginTab" type="button">GİRİŞ YAP</button>
+        <button class="auth-tab" id="registerTab" type="button">KAYIT OL</button>
+      </div>
+      <form class="auth-form" id="loginForm">
+        <label for="loginEmail">Gmail / E-posta</label>
+        <input id="loginEmail" type="email" autocomplete="email" placeholder="ornek@gmail.com" required maxlength="254" />
+        <label for="loginPassword">Şifre</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Şifren" required minlength="6" />
+        <button class="auth-submit" type="submit">OYUNA GİR ›</button>
+        <button class="auth-help" id="forgotPassword" type="button">Şifremi unuttum</button>
+      </form>
+      <form class="auth-form" id="registerForm" hidden>
+        <label for="registerEmail">Gmail / E-posta</label>
+        <input id="registerEmail" type="email" autocomplete="email" placeholder="ornek@gmail.com" required maxlength="254" />
+        <label for="registerPassword">Şifre (en az 6 karakter)</label>
+        <input id="registerPassword" type="password" autocomplete="new-password" placeholder="Şifre oluştur" required minlength="6" />
+        <label for="registerPassword2">Şifre tekrar</label>
+        <input id="registerPassword2" type="password" autocomplete="new-password" placeholder="Şifreyi tekrar gir" required minlength="6" />
+        <button class="auth-submit" type="submit">HESAP OLUŞTUR</button>
+      </form>
+      <div class="auth-status" id="authStatus" role="status" aria-live="polite"></div>
+      <p class="auth-note">Kayıt sonrası e-posta adresine doğrulama bağlantısı gönderilir. Doğrulamadan oyuna giriş yapılamaz.</p>
+    </section>
   </div>
 </div>
 
@@ -132,10 +169,78 @@
 
 <div class="fade-out" id="fadeOut"></div>
 
-<script>
-  document.getElementById('playBtn').addEventListener('click', () => {
-    document.getElementById('fadeOut').classList.add('on');
-    setTimeout(() => { window.location.href = 'game.html'; }, 650);
+<script type="module">
+  import { registerWithEmail, loginWithEmail, resetPassword } from './js/auth.js';
+  const $ = id => document.getElementById(id);
+  let mode = 'login';
+  function setMode(next) {
+    mode = next;
+    $('loginForm').hidden = next !== 'login';
+    $('registerForm').hidden = next !== 'register';
+    $('loginTab').classList.toggle('active', next === 'login');
+    $('registerTab').classList.toggle('active', next === 'register');
+    $('authStatus').textContent = '';
+    $('authStatus').classList.remove('error');
+  }
+  function status(message, error=false) {
+    $('authStatus').textContent = message;
+    $('authStatus').classList.toggle('error', error);
+  }
+  function busy(form, yes) {
+    const button = form.querySelector('.auth-submit');
+    button.disabled = yes;
+    button.textContent = yes ? 'İŞLENİYOR...' : (form.id === 'loginForm' ? 'OYUNA GİR ›' : 'HESAP OLUŞTUR');
+  }
+  $('loginTab').addEventListener('click', () => setMode('login'));
+  $('registerTab').addEventListener('click', () => setMode('register'));
+  $('registerForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form=e.currentTarget, email=$('registerEmail').value.trim();
+    const password=$('registerPassword').value, confirm=$('registerPassword2').value;
+    if(password.length<6) return status('Şifre en az 6 karakter olmalı.',true);
+    if(password!==confirm) return status('Şifreler eşleşmiyor.',true);
+    busy(form,true);
+    try {
+      await registerWithEmail(email,password);
+      form.reset();
+      setMode('login');
+      $('loginEmail').value=email;
+      status('Hesabın oluşturuldu. Gmail gelen kutuna doğrulama bağlantısı gönderdik. Spam klasörünü de kontrol et. Doğruladıktan sonra giriş yapabilirsin.');
+    } catch(err) {
+      const messages={
+        'auth/email-already-in-use':'Bu e-posta ile zaten hesap var. Giriş yapmayı dene.',
+        'auth/invalid-email':'E-posta adresi geçersiz.',
+        'auth/weak-password':'Şifre yeterince güçlü değil.',
+        'auth/operation-not-allowed':'Firebase Console’da Email/Password giriş yöntemini etkinleştir.'
+      };
+      status(messages[err.code] || err.message || 'Kayıt oluşturulamadı.',true);
+    } finally { busy(form,false); }
+  });
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const form=e.currentTarget, email=$('loginEmail').value.trim(), password=$('loginPassword').value;
+    busy(form,true);
+    try {
+      await loginWithEmail(email,password);
+      $('fadeOut').classList.add('on');
+      setTimeout(()=>{window.location.href='game.html';},350);
+    } catch(err) {
+      const messages={
+        'auth/email-not-verified':'E-posta adresin henüz doğrulanmamış. Gelen kutunu kontrol et.',
+        'auth/invalid-credential':'E-posta veya şifre hatalı.',
+        'auth/user-not-found':'Bu hesap bulunamadı. Önce kayıt ol.',
+        'auth/wrong-password':'Şifre hatalı.',
+        'auth/too-many-requests':'Çok fazla deneme yapıldı. Bir süre sonra tekrar dene.',
+        'auth/operation-not-allowed':'Firebase Console’da Email/Password giriş yöntemini etkinleştir.'
+      };
+      status(messages[err.code] || err.message || 'Giriş yapılamadı.',true);
+    } finally { busy(form,false); }
+  });
+  $('forgotPassword').addEventListener('click', async()=>{
+    const email=$('loginEmail').value.trim();
+    if(!email) return status('Önce e-posta adresini gir.',true);
+    try { await resetPassword(email); status('Şifre sıfırlama bağlantısı e-posta adresine gönderildi.'); }
+    catch(err) { status(err.message || 'Bağlantı gönderilemedi.',true); }
   });
 </script>
 
