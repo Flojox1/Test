@@ -6,6 +6,8 @@ import {
   MALE_NAMES, SURNAMES
 } from './data.js';
 import { START_PLOT, getProvince } from './plots.js';
+import { databaseURL } from './config.js';
+import { getFirebaseAuth } from './firebase.js';
 
 /* ---------- YARDIMCI: BOŞ DURUM ---------- */
 function freshInventory() {
@@ -48,11 +50,65 @@ function makeFreshState() {
 export const state = makeFreshState();
 
 /* ---------- KAYIT ---------- */
+let activeSaveUid = null;
+let remoteSaveTimer = null;
+let remoteSaveQueue = Promise.resolve();
+
+function isValidSave(parsed) {
+  return parsed && typeof parsed.money === "number" && Array.isArray(parsed.batches);
+}
+
+function applySave(parsed) {
+  Object.keys(state).forEach(k => delete state[k]);
+  Object.assign(state, parsed);
+  normalizeState();
+}
+
+function cloudSaveUrl(uid, token) {
+  const base = databaseURL.replace(/\/$/, "");
+  return `${base}/users/${encodeURIComponent(uid)}/gameSave.json?auth=${encodeURIComponent(token)}`;
+}
+
+async function writeCloudSave() {
+  const uid = activeSaveUid;
+  if (!uid) return;
+
+  const auth = await getFirebaseAuth();
+  const user = auth.currentUser;
+  if (!user || user.uid !== uid) return;
+
+  const token = await user.getIdToken();
+  const response = await fetch(cloudSaveUrl(uid, token), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(state)
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Bulut kayıt hatası (${response.status}): ${detail}`);
+  }
+
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+}
+
 export function save() {
   try {
     state.lastTick = Date.now();
-    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-  } catch (e) {}
+    const localKey = activeSaveUid ? `${SAVE_KEY}_${activeSaveUid}` : SAVE_KEY;
+    localStorage.setItem(localKey, JSON.stringify(state));
+  } catch (e) {
+    console.warn("Yerel kayıt yapılamadı:", e);
+  }
+
+  if (!activeSaveUid) return;
+  if (remoteSaveTimer) clearTimeout(remoteSaveTimer);
+
+  remoteSaveTimer = setTimeout(() => {
+    remoteSaveQueue = remoteSaveQueue
+      .then(() => writeCloudSave())
+      .catch(error => console.error("Hesap kaydı buluta gönderilemedi:", error));
+  }, 800);
 }
 
 // Eski/eksik alanları tamamlar
@@ -106,25 +162,55 @@ function normalizeState() {
   });
 }
 
-export function load() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) { refreshMasterPool(); refreshMarket(); return; }
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.money === 'number' && Array.isArray(parsed.batches)) {
-      Object.keys(state).forEach(k => delete state[k]);
-      Object.assign(state, parsed);
-      normalizeState();
-      if (state.availableMasters.length === 0) refreshMasterPool();
-      const elapsed = Math.max(0, (Date.now() - (state.lastTick || Date.now())) / 1000);
-      if (elapsed > 1) advanceOffline(elapsed);
-    } else {
-      refreshMasterPool(); refreshMarket();
-    }
-  } catch (e) {
-    if (state.availableMasters.length === 0) refreshMasterPool();
+export async function load(uid) {
+  if (!uid) throw new Error("Hesap kimliği bulunamadı.");
+  activeSaveUid = uid;
+
+  const auth = await getFirebaseAuth();
+  const user = auth.currentUser;
+  if (!user || user.uid !== uid) {
+    throw new Error("Oturum ile kayıt hesabı eşleşmiyor. Yeniden giriş yap.");
   }
+
+  const token = await user.getIdToken();
+  const response = await fetch(cloudSaveUrl(uid, token));
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Bulut kayıtları okunamadı (${response.status}): ${detail}`);
+  }
+
+  const cloudSave = await response.json();
+
+  if (isValidSave(cloudSave)) {
+    applySave(cloudSave);
+  } else {
+    const localKey = `${SAVE_KEY}_${uid}`;
+    let parsed = null;
+
+    try {
+      const accountLocal = localStorage.getItem(localKey);
+      const legacyLocal = localStorage.getItem(SAVE_KEY);
+      parsed = accountLocal ? JSON.parse(accountLocal) :
+        (legacyLocal ? JSON.parse(legacyLocal) : null);
+    } catch (e) {
+      console.warn("Eski kayıt okunamadı:", e);
+    }
+
+    if (isValidSave(parsed)) {
+      applySave(parsed);
+    } else {
+      refreshMasterPool();
+      refreshMarket();
+    }
+
+    save();
+  }
+
+  const elapsed = Math.max(0, (Date.now() - (state.lastTick || Date.now())) / 1000);
+  if (elapsed > 1) advanceOffline(elapsed);
   state.lastTick = Date.now();
+  save();
 }
 
 export function resetState() {
