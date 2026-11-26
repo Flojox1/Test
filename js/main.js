@@ -7,7 +7,7 @@ try {
     window.location.replace('index.html');
   } else {
     document.documentElement.dataset.accountEmail = user.email || '';
-    init();
+    await init(user.uid);
   }
 } catch (error) {
   console.error('Hesap doğrulaması başarısız:', error);
