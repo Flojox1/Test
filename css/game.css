@@ -696,7 +696,8 @@ body {
 }
 .profile-back.open { display:flex; }
 .profile-card {
-  position:relative; width:min(100%,360px); padding:28px 22px 24px; text-align:center;
+  position:relative; width:min(100%,360px); max-height:90dvh; overflow-y:auto;
+  padding:28px 22px 24px; text-align:center;
   background:linear-gradient(145deg,#1b2617,#10160e); border:1px solid rgba(139,195,74,.38);
   border-radius:16px; box-shadow:0 22px 70px rgba(0,0,0,.55);
 }
