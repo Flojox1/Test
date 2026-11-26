@@ -18,12 +18,31 @@ try {
       while (!playerName) {
         const entered = prompt('Oyuna hoş geldin! Kullanacağın oyuncu adını seç (2-20 karakter):');
         if (entered === null) { await (await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js')).signOut(await (await import('./firebase.js')).getFirebaseAuth()); window.location.replace('index.html'); throw new Error('İsim seçimi iptal edildi.'); }
-        const cleaned = entered.trim().replace(/\\s+/g, ' ').slice(0, 20);
+        const cleaned = entered.trim().replace(/\\\\s+/g, ' ').slice(0, 20);
         if (cleaned.length >= 2) playerName = cleaned;
         else alert('İsim en az 2 karakter olmalı.');
       }
       await set(profileRef, { name: playerName, createdAt: Date.now() });
     }
+    const currentProfile = (await get(profileRef)).val() || {};
+    document.getElementById('profileName').textContent = currentProfile.name || 'Oyuncu';
+    document.getElementById('profileEmail').textContent = user.email || 'E-posta bulunamadı';
+    const profileBack = document.getElementById('profileBack');
+    const closeProfile = () => {
+      profileBack.classList.remove('open');
+      profileBack.setAttribute('aria-hidden', 'true');
+    };
+    document.getElementById('profileOpen').addEventListener('click', () => {
+      profileBack.classList.add('open');
+      profileBack.setAttribute('aria-hidden', 'false');
+    });
+    document.getElementById('profileClose').addEventListener('click', closeProfile);
+    profileBack.addEventListener('click', event => {
+      if (event.target === profileBack) closeProfile();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeProfile();
+    });
     await init(user.uid);
   }
 } catch (error) {
