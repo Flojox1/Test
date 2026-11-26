@@ -1,5 +1,6 @@
 import { requireVerifiedUser, changeAccountPassword } from './auth.js';
 import { init } from './game.js';
+import { initEmpireBusiness } from './empire-business.js';
 import { getFirebaseApp, getFirebaseAuth } from './firebase.js';
 
 function choosePlayerName() {
@@ -118,6 +119,7 @@ try {
     });
 
     await init(user.uid);
+    initEmpireBusiness();
   }
 } catch (error) {
   console.error('Oyun başlatılamadı:', error);
