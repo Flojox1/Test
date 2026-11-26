@@ -98,8 +98,13 @@ export function createEmpireState() {
     },
     world: {
       cityId: null,
+      cityName: null,
       districtId: null,
-      propertyId: null
+      districtName: null,
+      neighborhoodId: null,
+      neighborhoodName: null,
+      propertyId: null,
+      setupComplete: false
     },
     character: null,
     estate: {
