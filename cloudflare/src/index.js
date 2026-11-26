@@ -210,7 +210,7 @@ async function signAdminCustomToken(env) {
 }
 
 async function requireAdmin(request, env) {
-  const token = request.headers.get("Authorization")?.replace(/^Bearer\\s+/i, "");
+  const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) throw new Error("Admin oturumu gerekli.");
   const user = await verifyFirebaseToken(token, env);
   if (user.uid !== ADMIN_UID) throw new Error("Bu işlem için yönetici yetkisi gerekli.");
