@@ -219,8 +219,10 @@ async function requireAdmin(request, env) {
 
 async function dbRequest(path, env, method = "GET", value) {
   const accessToken = await getGoogleAccessToken(env);
-  const response = await fetch(`${DATABASE_URL}/${path}.json`, {
-    method, headers: { "Content-Type": "application/json", "Authorization": `Bearer ${accessToken}` },
+  const dbUrl = new URL(`${DATABASE_URL}/${path}.json`);
+  dbUrl.searchParams.set("access_token", accessToken);
+  const response = await fetch(dbUrl.toString(), {
+    method, headers: { "Content-Type": "application/json" },
     ...(method === "GET" || method === "DELETE" ? {} : { body: JSON.stringify(value) })
   });
   const rawBody = await response.text().catch(() => "");
