@@ -173,6 +173,13 @@ function renderEmpireSetup() {
     save();
     render();
   });
+
+  // Seçim ekranı yarıda kapatılıp yeniden açılırsa kayıtlı konumun listelerini geri yükle.
+  if (world.cityId && !empireDistrictsFor && !empireLocationLoading && !empireLocationError) {
+    ensureEmpireDistricts();
+  } else if (world.districtId && !empireNeighborhoodsFor && !empireLocationLoading && !empireLocationError) {
+    ensureEmpireNeighborhoods();
+  }
 }
 
 function renderEmpireHome() {
