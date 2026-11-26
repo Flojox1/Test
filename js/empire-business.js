@@ -1,4 +1,4 @@
-import { state, save } from './core.js';
+import { state, save, sellFromStock, storageUsed } from './core.js';
 import { render as renderGame, advanceState } from './game.js';
 
 const CATALOG = [
@@ -27,12 +27,12 @@ function ensureEconomy() {
     empire.economy = {
       day: state.day || 1, dirtyBalance: 0, suspicion: 0, audits: 0,
       lastAuditDay: 0, frozenUntil: 0, log: [],
-      businesses: []
+      businesses: [], ordersCompleted: 0, activeOrder: 0, shelter: null, blackMarket: false, shadowGoods: 0
     };
   }
   const e = empire.economy;
   if (!Array.isArray(e.businesses)) e.businesses = [];
-  if (!Array.isArray(e.log)) e.log = [];
+  if (!Array.isArray(e.log)) e.log = [];\n  if (!Number.isFinite(Number(e.ordersCompleted))) e.ordersCompleted = 0;\n  if (!Number.isFinite(Number(e.shadowGoods))) e.shadowGoods = 0;\n  if (typeof e.blackMarket !== 'boolean') e.blackMarket = e.ordersCompleted >= 5;
   ['day','dirtyBalance','suspicion','audits','lastAuditDay','frozenUntil'].forEach(k => {
     if (!Number.isFinite(Number(e[k]))) e[k] = 0;
   });
@@ -68,6 +68,81 @@ function buyBusiness(id) {
     suspicion: 0, frozen: false
   });
   logEvent(item.name + ' satın alındı.');
+  save(); renderGame();
+}
+
+const ORDERS = [
+  { name: 'İlk Kafe Siparişi', kg: 2, reward: 9000 },
+  { name: 'Mahalle Restoranı', kg: 4, reward: 21000 },
+  { name: 'Otel Mutfağı', kg: 7, reward: 42000 },
+  { name: 'Toplu Etkinlik', kg: 10, reward: 65000 },
+  { name: 'Şehir Distribütörü', kg: 15, reward: 110000 }
+];
+
+function buyShelter() {
+  const e = ensureEconomy();
+  if (e.shelter) return;
+  const cost = 280000;
+  if (state.money < cost) { alert('Sığınak için ₺280.000 gerekiyor.'); return; }
+  state.money -= cost;
+  e.shelter = { racks: 0, fan: false, recipeDesk: false, plants: [], machines: [{ id: 'ventilation', name: 'Havalandırma ünitesi', broken: false, durability: 100 }], lastPlantCheck: state.day, lastMachineCheck: state.day };
+  logEvent('Konteyner altındaki gizli sığınak açıldı.');
+  save(); renderGame();
+}
+
+function buyShelterItem(item) {
+  const e = ensureEconomy();
+  if (!e.shelter) return;
+  const prices = { rack: 45000, fan: 90000, desk: 125000, botanical: 18000 };
+  const cost = prices[item];
+  if (!cost || state.money < cost) { alert('Bunun için yeterli paran yok.'); return; }
+  if (item === 'rack' && e.shelter.racks >= 8) return;
+  if (item === 'fan' && e.shelter.fan) return;
+  if (item === 'desk' && e.shelter.recipeDesk) return;
+  state.money -= cost;
+  if (item === 'rack') e.shelter.racks += 1;
+  if (item === 'fan') e.shelter.fan = true;
+  if (item === 'desk') e.shelter.recipeDesk = true;
+  if (item === 'botanical') e.shelter.plants.push({ id: crypto.randomUUID(), plantedDay: state.day, ready: false, alive: true });
+  logEvent(({rack:'Sığınağa raf eklendi.',fan:'Havalandırma ekipmanı alındı.',desk:'İşleme masası alındı.',botanical:'Bir kurgusal botanik koleksiyon birimi eklendi.'})[item]);
+  save(); renderGame();
+}
+
+function completeOrder() {
+  const e = ensureEconomy();
+  const order = ORDERS[e.ordersCompleted];
+  if (!order) return;
+  if (storageUsed() < order.kg) { alert('Sipariş için depoda yeterli mantar yok.'); return; }
+  sellFromStock(order.kg);
+  state.money += order.reward;
+  e.ordersCompleted += 1;
+  logEvent(order.name + ' tamamlandı. Ek ödül: ' + money(order.reward) + '.');
+  if (e.ordersCompleted >= ORDERS.length) {
+    e.blackMarket = true;
+    logEvent('Kara Pazar erişimi açıldı.');
+  }
+  save(); renderGame();
+}
+
+function processBotanical() {
+  const e = ensureEconomy();
+  const s = e.shelter;
+  if (!s || !s.recipeDesk || !s.fan || !s.plants.some(p => p.alive && p.ready)) return;
+  const plant = s.plants.find(p => p.alive && p.ready);
+  plant.alive = false;
+  e.shadowGoods += 1;
+  logEvent('Kurgusal özel ürün işlendi ve envantere eklendi.');
+  save(); renderGame();
+}
+
+function sellShadowGoods() {
+  const e = ensureEconomy();
+  if (!e.blackMarket || e.shadowGoods < 1) return;
+  const amount = e.shadowGoods;
+  const revenue = amount * 42000;
+  e.shadowGoods = 0;
+  e.dirtyBalance += revenue;
+  logEvent(amount + ' adet kurgusal özel ürün pazar üzerinden satıldı. Gizli bakiye +' + money(revenue) + '.');
   save(); renderGame();
 }
 
@@ -177,6 +252,21 @@ function renderBusinessPanel() {
     const price = Math.round(item.price * cityFactor());
     return '<article class="eb-card"><div class="eb-title"><span>' + item.icon + ' ' + item.name + '</span><b>' + money(price) + '</b></div><p>Günlük tahmini ciro: ' + money(item.income * cityFactor()) + '</p><button class="btn btn-green" data-eb="buy" data-id="' + item.id + '">İşletmeyi satın al</button></article>';
   }).join('');
+  const currentOrder = ORDERS[e.ordersCompleted];
+  const shelter = e.shelter;
+  const shelterPanel = !shelter
+    ? '<h3>Gizli Sığınak</h3><p class="eb-muted">Konteynerin altında özel bir alan aç. Maliyet: ₺280.000</p><button class="btn btn-green" data-eb="shelter">Sığınağı aç</button>'
+    : '<h3>Gizli Sığınak</h3><div class="eb-summary"><div><small>Raf</small><b>' + shelter.racks + '/8</b></div><div><small>Fan</small><b>' + (shelter.fan?'Var':'Yok') + '</b></div><div><small>İşleme masası</small><b>' + (shelter.recipeDesk?'Var':'Yok') + '</b></div><div><small>Hazır ürün birimi</small><b>' + shelter.plants.filter(p=>p.alive&&p.ready).length + '</b></div></div>' +
+      '<div class="eb-actions"><button class="btn btn-ghost" data-eb="rack">Raf ₺45.000</button><button class="btn btn-ghost" data-eb="fan">Fan ₺90.000</button><button class="btn btn-ghost" data-eb="desk">İşleme masası ₺125.000</button><button class="btn btn-ghost" data-eb="botanical">Botanik birim ₺18.000</button></div>' +
+      '<p>Toplam birim: ' + shelter.plants.length + ' · Büyüme süresi: 7 oyun günü · Rastgele kayıp kontrolü: 30 günde bir</p>' +
+      '<button class="btn btn-green" data-eb="process">Hazır birimi işle</button><p>İşlenmiş kurgusal ürün: ' + e.shadowGoods + '</p>' +
+      '<p>Ekipman: ' + shelter.machines.map(m=>m.name + (m.broken?' (Arızalı)':' (Çalışıyor)')).join(' · ') + '</p><button class="btn btn-ghost" data-eb="repairMachine">Ekipmanı onar ₺25.000</button>';
+  const blackMarketPanel = e.blackMarket
+    ? '<h3>Kara Pazar</h3><p>İşlenmiş kurgusal ürün: ' + e.shadowGoods + ' · Gizli bakiye: ' + money(e.dirtyBalance) + '</p><button class="btn btn-green" data-eb="sellShadow" ' + (e.shadowGoods?'':'disabled') + '>Ürünleri sat</button>'
+    : '<h3>Kara Pazar</h3><p class="eb-muted">Kara Pazar, beş müşteri siparişini tamamlayınca açılacak.</p>';
+  const orderPanel = currentOrder
+    ? '<h3>Mantar Müşterileri (' + e.ordersCompleted + '/' + ORDERS.length + ')</h3><article class="eb-card"><b>' + currentOrder.name + '</b><p>' + currentOrder.kg + ' kg mantar teslim et · Ek ödül: ' + money(currentOrder.reward) + '</p><button class="btn btn-green" data-eb="order">Siparişi teslim et</button></article>'
+    : '<h3>Mantar Müşterileri</h3><p>Tüm ilk müşteri siparişleri tamamlandı.</p>';
   const businesses = e.businesses.map(b => {
     const item = CATALOG.find(x => x.id === b.type);
     const frozen = b.frozen || e.frozenUntil >= e.day;
@@ -192,6 +282,7 @@ function renderBusinessPanel() {
   panel.innerHTML = '<div class="eb-heading"><h2>Şehir İşletmeleri</h2><span>Oyun günü ' + e.day + '</span></div>' +
     '<div class="eb-summary"><div><small>Normal bakiye</small><b>' + money(state.money) + '</b></div><div><small>Gizli bakiye</small><b>' + money(e.dirtyBalance) + '</b></div><div><small>Genel şüphe</small><b>%' + Math.round(e.suspicion) + '</b></div><div><small>Son denetim</small><b>' + (e.lastAuditDay || 'Yok') + '</b></div></div>' +
     '<button class="btn btn-green eb-day" data-eb="day">+ 1 Oyun Günü İlerle</button>' +
+    orderPanel + shelterPanel + blackMarketPanel +
     '<h3>Satın Alınabilir İşletmeler</h3><div class="eb-grid">' + (catalog || '<p class="eb-muted">Bu katalogdaki tüm işletmelere sahipsin.</p>') + '</div>' +
     '<h3>Sahip Olduğun İşletmeler</h3><div class="eb-grid">' + (businesses || '<p class="eb-muted">Henüz işletmen yok. İlk işletmeni satın alabilirsin.</p>') + '</div>' +
     '<h3>Şehir Denetim Kaydı</h3><div class="eb-log">' + (e.log.length ? e.log.map(x => '<p><b>Gün ' + x.day + ':</b> ' + x.message + '</p>').join('') : '<p>Henüz kayıt yok.</p>') + '</div>' +
@@ -236,6 +327,18 @@ export function initEmpireBusiness() {
     const action = button.dataset.eb;
     const id = button.dataset.id;
     if (action === 'buy') buyBusiness(id);
+    else if (action === 'shelter') buyShelter();
+    else if (action === 'rack' || action === 'fan' || action === 'desk' || action === 'botanical') buyShelterItem(action);
+    else if (action === 'order') completeOrder();
+    else if (action === 'process') processBotanical();
+    else if (action === 'sellShadow') sellShadowGoods();
+    else if (action === 'repairMachine') {
+      const e = ensureEconomy();
+      if (e.shelter && e.shelter.machines.some(m=>m.broken) && state.money >= 25000) {
+        state.money -= 25000; e.shelter.machines.forEach(m=>{m.broken=false;m.durability=100;});
+        logEvent('Sığınak ekipmanı onarıldı.'); save(); renderGame();
+      } else alert('Onarım için arızalı ekipman ve ₺25.000 gerekiyor.');
+    }
     else if (action === 'upgrade') upgradeBusiness(id);
     else if (action === 'staff') hireStaff(id);
     else if (action === 'repair') repairBusiness(id);
