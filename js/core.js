@@ -145,8 +145,11 @@ function normalizeState() {
   // sahipliği değildir. Konteyner var diye otomatik olarak arsa ekleme.
   if (!Array.isArray(state.plots)) state.plots = [];
   state.plots = state.plots.filter(p => p && getProvince(p.id));
+  // Özel fırsat satın alınana kadar oyuncunun hiçbir şehir arsası yoktur.
+  // Eski sürümde otomatik eklenen Aksaray arsası da bu aşamada temizlenir.
+  if (!state.empire.unlocked) state.plots = [];
   state.containers.forEach(c => {
-    if (!c.plotId || !getProvince(c.plotId)) c.plotId = START_PLOT;
+    if (!state.empire.unlocked || !c.plotId || !getProvince(c.plotId)) c.plotId = START_PLOT;
   });
 
   if (!Array.isArray(state.masters)) state.masters = [];
