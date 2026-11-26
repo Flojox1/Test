@@ -16,7 +16,7 @@ function base64url(input) {
   const bytes = typeof input === "string" ? new TextEncoder().encode(input) : new Uint8Array(input);
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/=/g, "").replace(/\\+/g, "-").replace(/\\//g, "_");
+  return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 async function sha256(value) {
@@ -40,7 +40,7 @@ async function verifyFirebaseToken(idToken, env) {
 
 function pemToArrayBuffer(pem) {
   const base64 = pem.replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "").replace(/\\s/g, "");
+    .replace(/-----END PRIVATE KEY-----/g, "").replace(/\s/g, "");
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -126,7 +126,7 @@ async function sendBrevoEmail(email, code, env) {
 }
 
 async function handleSendCode(request, env) {
-  const idToken = request.headers.get("Authorization")?.replace(/^Bearer\\s+/i, "");
+  const idToken = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   if (!idToken) return json({ error: "Oturum bulunamadı. Tekrar giriş yap." }, 401);
   const user = await verifyFirebaseToken(idToken, env);
   if (user.emailVerified) return json({ error: "E-posta zaten doğrulanmış." }, 409);
@@ -159,7 +159,7 @@ async function handleSendCode(request, env) {
 }
 
 async function handleVerifyCode(request, env) {
-  const idToken = request.headers.get("Authorization")?.replace(/^Bearer\\s+/i, "");
+  const idToken = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
   if (!idToken) return json({ error: "Oturum bulunamadı. Tekrar giriş yap." }, 401);
   const user = await verifyFirebaseToken(idToken, env);
   if (user.emailVerified) return json({ success: true, verified: true });
@@ -174,7 +174,7 @@ async function handleVerifyCode(request, env) {
 
   const body = await request.json().catch(() => ({}));
   const code = String(body.code || "").trim();
-  if (!/^\\d{6}$/.test(code)) return json({ error: "6 haneli kodu gir." }, 400);
+  if (!/^\d{6}$/.test(code)) return json({ error: "6 haneli kodu gir." }, 400);
 
   const submittedHash = await sha256(`${env.CODE_PEPPER}:${user.uid}:${code}`);
   if (submittedHash !== record.hash) {
