@@ -196,7 +196,7 @@
   function busy(form, yes) {
     const button = form.querySelector('.auth-submit');
     button.disabled = yes;
-    button.textContent = yes ? 'İŞLENİYOR...' : (form.id === 'loginForm' ? 'OYUNA GİR ›' : 'HESAP OLUŞTUR');
+    button.textContent = yes ? 'İŞLENİYOR...' : (form.id === 'loginForm' ? 'OYUNA GİR ›' : (form.id === 'verifyForm' ? 'KODU DOĞRULA' : 'HESAP OLUŞTUR'));
   }
   $('loginTab').addEventListener('click', () => setMode('login'));
   $('registerTab').addEventListener('click', () => setMode('register'));
@@ -257,7 +257,7 @@
         'auth/too-many-requests':'Çok fazla deneme yapıldı. Bir süre sonra tekrar dene.',
         'auth/operation-not-allowed':'Firebase Console’da Email/Password giriş yöntemini etkinleştir.'
       };
-      status(messages[err.code] || err.message || 'Giriş yapılamadı.',true);
+      if (err.code === 'auth/email-not-verified') {\n        $('loginForm').hidden=true; $('registerForm').hidden=true;\n        $('loginTab').classList.remove('active'); $('registerTab').classList.remove('active');\n        $('verifyForm').hidden=false; mode='verify';\n        status('E-posta henüz doğrulanmamış. Gmail adresine yeni kod gönderebilirsin.',true);\n      } else { status(messages[err.code] || err.message || 'Giriş yapılamadı.',true); }
     } finally { busy(form,false); }
   });
   $('forgotPassword').addEventListener('click', async()=>{
