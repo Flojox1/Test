@@ -48,15 +48,23 @@ async function ensureEmpireDistricts() {
   empireLocationLoading = 'districts';
   empireLocationError = '';
   try {
-    const response = await fetch(`https://api.turkiyeapi.dev/v2/provinces/${cityId}/districts?fields=id,name&sort=name&limit=1000`);
-    if (!response.ok) throw new Error('İlçe listesi alınamadı.');
+    // Nested endpoint bazı ağlarda/CDN önbelleklerinde sorun çıkarırsa
+    // belgelenmiş provinceId filtreli liste endpoint'ine geç.
+    let response = await fetch(`https://api.turkiyeapi.dev/v2/provinces/${cityId}/districts?fields=id,name,provinceId&sort=name&limit=1000`);
+    if (!response.ok) {
+      response = await fetch(`https://api.turkiyeapi.dev/v2/districts?provinceId=${cityId}&fields=id,name,provinceId&sort=name&limit=1000`);
+    }
+    if (!response.ok) throw new Error(`İlçe servisi HTTP ${response.status}`);
     const result = await response.json();
     if (Number(state.empire?.world?.cityId) === cityId) {
-      empireDistricts = Array.isArray(result.data) ? result.data : [];
+      empireDistricts = Array.isArray(result.data)
+        ? result.data.filter(d => Number(d.provinceId) === cityId || d.provinceId == null)
+        : [];
       empireDistrictsFor = cityId;
+      if (!empireDistricts.length) throw new Error('Bu şehir için ilçe kaydı bulunamadı.');
     }
   } catch (error) {
-    empireLocationError = 'İlçe listesi yüklenemedi. İnternet bağlantını kontrol edip tekrar dene.';
+    empireLocationError = `İlçeler yüklenemedi: ${error?.message || 'API bağlantısı kurulamadı'}. Tekrar deneyebilirsin.`;
     console.warn('Empire ilçe listesi yüklenemedi:', error);
   } finally {
     empireLocationLoading = '';
