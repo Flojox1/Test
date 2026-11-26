@@ -1,22 +1,36 @@
-# FloRod: kodla e-posta doğrulama ve admin kurulumu
+# FloRod: Firebase Spark + Cloudflare Worker ile e-posta kodu doğrulama
 
-## E-posta kodu
-Kayıt sonrası Firebase Authentication hesabı açılır; Cloud Function kullanıcıya 6 haneli kod yollar. Kod 5 dakika geçerlidir, 60 saniyede bir yeniden gönderilebilir ve en fazla 5 yanlış deneme kabul edilir. Kodun kendisi veritabanında tutulmaz; HMAC özeti saklanır.
+Bu proje e-posta doğrulaması için Firebase Cloud Functions kullanmaz. Firebase Authentication kullanıcıyı oluşturur; Cloudflare Worker 6 haneli kodu gönderir ve doğrular. Böylece Firebase Spark planında kalınabilir.
 
-## Firebase / Cloud Functions kurulumu
-1. Firebase projesinde **Blaze** planını etkinleştir (Cloud Functions dağıtımı için faturalandırma gerekir).
-2. Firebase Console > Authentication > Sign-in method > Email/Password açık olsun.
-3. Bilgisayarda `npm install -g firebase-tools`, ardından `firebase login` çalıştır.
-4. Depoyu klonla; proje kökünde `firebase use chat-f3082` çalıştır.
-5. `cd functions && npm install && cd ..`
-6. SMTP sağlayıcından uygulama şifresi/API SMTP bilgilerini al. Gmail kullanıyorsan normal Gmail şifreni değil, 2 adımlı doğrulama sonrası uygulama şifresini kullan.
-7. Proje kökünde şu secret'ları tanımla: `firebase functions:secrets:set SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `CODE_PEPPER` (her biri için komutu ayrı çalıştır; istenince değeri gir).
-8. `firebase deploy --only functions`
+## Akış
+1. Kullanıcı Firebase Authentication ile e-posta/şifre hesabı oluşturur.
+2. Tarayıcı Firebase ID token'ını Cloudflare Worker'a gönderir.
+3. Worker ID token'ı Firebase Identity Toolkit ile doğrular.
+4. Worker 6 haneli kod üretir; kodun SHA-256 özeti Cloudflare KV'de tutulur.
+5. Brevo üzerinden e-posta gönderilir.
+6. Kullanıcı kodu girince Worker kodu kontrol eder ve Google servis hesabı üzerinden Firebase hesabını `emailVerified: true` yapar.
 
-## Admin hesabı
-Admin hesabı tarayıcıya sabit şifre gömülerek oluşturulmaz. Firebase servis hesabı kimlik bilgilerini güvenli biçimde yerel bilgisayarına indir; JSON dosyasını GitHub'a yükleme. `GOOGLE_APPLICATION_CREDENTIALS`, `ADMIN_EMAIL` ve güçlü `ADMIN_PASSWORD` ortam değişkenlerini ayarlayıp `cd functions && node set-admin.js` çalıştır. Script kullanıcıya `role: admin` custom claim verir. Admin girişi Firebase Authentication e-posta/şifre hesabıyla yapılır; görünen adı admin olur. İstenen admin123 şifresi repoya yazılmadı; çok kolay tahmin edilir ve güvenli değildir.
+## Kurulum
 
-## Notlar
-- Cloud Functions endpoint'i `europe-west1` bölgesindedir.
-- Realtime Database güvenlik kurallarını ayrıca yapılandır; Admin SDK kuralları atlar.
-- Bu dosyalar kod altyapısını ekler; SMTP secret'ları girilip fonksiyonlar deploy edilmeden e-posta gönderimi çalışmaz.
+Ayrıntılı adımlar için `cloudflare/README.md` dosyasına bak.
+
+1. Firebase Console > Authentication > Sign-in method > Email/Password açık olsun.
+2. Cloudflare hesabında Workers Free planını ve KV namespace'i oluştur.
+3. Brevo Free hesabı oluştur, gönderici e-postanı doğrula ve API key al.
+4. Google Cloud Console'da servis hesabı oluştur; projeye Firebase Authentication Admin rolü (veya `firebaseauth.users.update` izni) ver. JSON anahtarını güvenli sakla.
+5. Worker secret'larını `cloudflare/README.md` içindeki komutlarla tanımla.
+6. `cloudflare/wrangler.toml` içindeki KV namespace ID alanını doldur.
+7. `cd cloudflare && npx wrangler deploy` komutuyla Worker'ı dağıt.
+8. Worker URL'sini `js/auth.js` içindeki `AUTH_WORKER_URL` değerine yaz.
+
+## Ücretsiz limitler
+
+- Cloudflare Workers Free: günlük 100.000 istek.
+- Brevo Free: günlük 300 e-posta. Limitler ve plan koşulları değişebilir.
+- Firebase Spark planı korunur; bu akışta Cloud Functions deploy edilmez.
+
+## Önemli
+- Servis hesabı JSON'u, Brevo API key'i ve CODE_PEPPER asla GitHub'a yüklenmemeli.
+- Cloudflare KV'deki deneme sayacı yüksek hacimli/eşzamanlı saldırılarda atomik değildir. Büyük ölçekli üretimde D1 veya Durable Objects tabanlı sayaç kullanılmalı.
+- Firebase Realtime Database güvenlik kuralları ayrıca korunmalı.
+- Daha önce eklenmiş `functions/` klasörü bu yeni akışta kullanılmaz; Cloud Functions deploy etme.
