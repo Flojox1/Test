@@ -725,6 +725,7 @@ body {
 
 
 /* ===== EMPIRE BAŞLANGIÇ VE ANA EKRAN ===== */
+body.empire-mode .hud[hidden],body.empire-mode #tabs[hidden],body.empire-mode #chatToggle[hidden] { display:none!important; }
 body.empire-mode { background:radial-gradient(ellipse at 50% 0%,rgba(106,168,79,.12),transparent 55%),var(--bg); }
 body.empire-mode .content { width:100%; max-width:1100px; margin:0 auto; padding:22px 14px 50px; }
 body.empire-mode .chat-panel,body.empire-mode .chat-toggle { display:none!important; }
