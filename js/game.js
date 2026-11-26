@@ -325,7 +325,10 @@ export function processMasters() {
 /* ---------- PAZAR ---------- */
 export function addToCart(mat, qty) {
   if (!state.cart) state.cart = {};
-  state.cart[mat] = (state.cart[mat] || 0) + qty;
+  const wholeOnly = MATERIALS[mat]?.unit === 'adet';
+  const safeQty = wholeOnly ? Math.floor(Number(qty)) : Math.round(Number(qty) * 100) / 100;
+  if (!Number.isFinite(safeQty) || safeQty <= 0) return;
+  state.cart[mat] = Math.round(((state.cart[mat] || 0) + safeQty) * 100) / 100;
   save(); renderPazar();
 }
 export function cartTotal() {
@@ -811,7 +814,7 @@ export function renderPazar() {
         <div class="mat-controls">
           <button class="btn btn-ghost" data-action="cartAdd" data-mat="${key}" data-qty="1">+1</button>
           <button class="btn btn-ghost" data-action="cartAdd" data-mat="${key}" data-qty="10">+10</button>
-          <input type="number" class="qty-input" data-mat="${key}" placeholder="Miktar..." min="1" inputmode="numeric" />
+          <input type="text" class="qty-input" data-mat="${key}" placeholder="${m.unit === 'adet' ? 'Adet...' : 'Örn. 0,5'}" inputmode="${m.unit === 'adet' ? 'numeric' : 'decimal'}" autocomplete="off" aria-label="${m.name} miktarı" />
           <button class="btn btn-ghost" data-action="cartAddCustom" data-mat="${key}">Ekle</button>
         </div>
       </div>
@@ -830,7 +833,7 @@ export function renderPazar() {
       total += sub;
       rows += `
         <div class="cart-row">
-          <span>${m.icon} ${m.name} × ${q}</span>
+          <span>${m.icon} ${m.name} × ${Number(q).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ${m.unit}</span>
           <span>₺${sub}</span>
           <button class="cart-rm" data-action="cartRemove" data-mat="${k}">×</button>
         </div>
@@ -1223,8 +1226,10 @@ export function setupEvents() {
     else if (a === 'cartAddCustom') {
       const mat = btn.dataset.mat;
       const input = tabContent.querySelector('.qty-input[data-mat="' + mat + '"]');
-      const qty = parseInt(input.value);
-      if (!qty || qty < 1) { alert('Geçerli miktar gir.'); return; }
+      const raw = input.value.trim().replace(',', '.');
+      const qty = Number(raw);
+      const wholeOnly = MATERIALS[mat]?.unit === 'adet';
+      if (!Number.isFinite(qty) || qty <= 0 || (wholeOnly && !Number.isInteger(qty))) { alert(wholeOnly ? 'Adet miktarı tam sayı olmalı.' : '0’dan büyük geçerli bir miktar gir. Örn. 0,5'); return; }
       addToCart(mat, qty);
     }
     else if (a === 'cartRemove') { delete state.cart[btn.dataset.mat]; save(); renderPazar(); }
@@ -1238,8 +1243,10 @@ export function setupEvents() {
     if (e.target.classList.contains('qty-input') && e.key === 'Enter') {
       e.preventDefault();
       const mat = e.target.dataset.mat;
-      const qty = parseInt(e.target.value);
-      if (!qty || qty < 1) return;
+      const raw = e.target.value.trim().replace(',', '.');
+      const qty = Number(raw);
+      const wholeOnly = MATERIALS[mat]?.unit === 'adet';
+      if (!Number.isFinite(qty) || qty <= 0 || (wholeOnly && !Number.isInteger(qty))) return;
       addToCart(mat, qty);
     }
   });
