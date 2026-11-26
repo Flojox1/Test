@@ -679,3 +679,46 @@ body {
 @media (prefers-reduced-motion:reduce) {
   *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; }
 }
+
+
+/* ===== OYUNCU PROFİLİ ===== */
+.profile-trigger {
+  flex:0 0 34px; width:34px; height:34px; display:grid; place-items:center;
+  border-radius:50%; border:1px solid rgba(139,195,74,.45);
+  background:linear-gradient(145deg,#293923,#151d12); color:var(--text);
+  font-size:1rem; cursor:pointer; -webkit-tap-highlight-color:transparent;
+  box-shadow:0 2px 10px rgba(0,0,0,.25);
+}
+.profile-trigger:active { transform:scale(.94); }
+.profile-back {
+  position:fixed; inset:0; z-index:30; display:none; align-items:center; justify-content:center;
+  padding:20px; background:rgba(0,0,0,.78); backdrop-filter:blur(7px);
+}
+.profile-back.open { display:flex; }
+.profile-card {
+  position:relative; width:min(100%,360px); padding:28px 22px 24px; text-align:center;
+  background:linear-gradient(145deg,#1b2617,#10160e); border:1px solid rgba(139,195,74,.38);
+  border-radius:16px; box-shadow:0 22px 70px rgba(0,0,0,.55);
+}
+.profile-close {
+  position:absolute; top:10px; right:12px; width:32px; height:32px;
+  color:var(--muted); background:transparent; border:1px solid var(--border);
+  border-radius:8px; font-size:1.35rem; cursor:pointer;
+}
+.profile-avatar {
+  width:66px; height:66px; margin:0 auto 14px; display:grid; place-items:center;
+  border-radius:50%; font-size:1.8rem; background:rgba(139,195,74,.12);
+  border:1px solid rgba(139,195,74,.42);
+}
+.profile-card h2 {
+  color:var(--green-bright); font:700 .78rem var(--font-head);
+  letter-spacing:2px; text-transform:uppercase; margin-bottom:16px;
+}
+.profile-name { font:700 1.2rem var(--font-head); overflow-wrap:anywhere; }
+.profile-email-label {
+  margin-top:18px; color:var(--muted); font-size:.58rem;
+  font-weight:700; letter-spacing:2px;
+}
+.profile-email {
+  margin-top:6px; color:var(--text); font-size:.82rem; overflow-wrap:anywhere;
+}
