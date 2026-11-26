@@ -20,7 +20,7 @@ import {
 } from './data.js';
 
 import { PROVINCES, MAP_VIEWBOX } from './provinces.js';
-import { getProvince, plotPrice } from './plots.js';
+import { START_PLOT, getProvince, plotPrice } from './plots.js';
 
 import { initChat } from './chat.js';
 import { getFirebaseApp } from './firebase.js';
