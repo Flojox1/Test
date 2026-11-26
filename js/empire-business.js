@@ -194,7 +194,17 @@ export function initEmpireBusiness() {
   if (mounted) return;
   mounted = true;
   addStyles();
-  document.addEventListener('input', event => {\n    const slider = event.target.closest('[data-eb-activity]');\n    if (!slider) return;\n    const business = ensureEconomy().businesses.find(x => x.id === slider.dataset.ebActivity);\n    if (!business) return;\n    business.activity = Number(slider.value) / 100;\n    const label = slider.closest('.eb-activity')?.querySelector('b');\n    if (label) label.textContent = '%' + slider.value;\n    save();\n  });\n  document.addEventListener('click', event => {
+  document.addEventListener('input', event => {
+    const slider = event.target.closest('[data-eb-activity]');
+    if (!slider) return;
+    const business = ensureEconomy().businesses.find(x => x.id === slider.dataset.ebActivity);
+    if (!business) return;
+    business.activity = Number(slider.value) / 100;
+    const label = slider.closest('.eb-activity')?.querySelector('b');
+    if (label) label.textContent = '%' + slider.value;
+    save();
+  });
+  document.addEventListener('click', event => {
     const button = event.target.closest('[data-eb]');
     if (!button) return;
     const action = button.dataset.eb;
