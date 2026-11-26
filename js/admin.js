@@ -15,10 +15,8 @@ async function login(e){
  try{
   const r=await fetch(WORKER+'/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:$('adminUser').value,password:$('adminPass').value})});
   const d=await r.json();if(!r.ok)throw new Error(d.error||'Giriş başarısız.');
-  const app=await getFirebaseApp();const {getAuth,signInWithCustomToken}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
-  await signInWithCustomToken(getAuth(app),d.customToken);
-  $('loginCard').hidden=true;$('dashboard').hidden=false;status('');
-  await loadPlayers();
+  const app=await getFirebaseApp();const {getAuth,signInWithCustomToken,setPersistence,browserLocalPersistence}=await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+  const a=getAuth(app);await setPersistence(a,browserLocalPersistence);await signInWithCustomToken(a,d.customToken);
  }catch(err){status(err.message,true);}
 }
 async function loadPlayers(){
@@ -70,7 +68,7 @@ $('adminLogin').addEventListener('submit',login);
 $('refreshPlayers').addEventListener('click',loadPlayers);
 $('adminLogout').addEventListener('click',async()=>{const a=await auth();await (await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js')).signOut(a);$('dashboard').hidden=true;$('loginCard').hidden=false;});
 let chatPoll=null;document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-admin-tab]').forEach(x=>x.classList.toggle('active',x===b));$('playersPane').hidden=b.dataset.adminTab!=='players';$('chatPane').hidden=b.dataset.adminTab!=='chat';if(b.dataset.adminTab==='chat'){loadChat();if(chatPoll)clearInterval(chatPoll);chatPoll=setInterval(()=>{if(!document.hidden&&!$('chatPane').hidden)loadChat();},4000);}else if(chatPoll){clearInterval(chatPoll);chatPoll=null;}}));
-$('chatToggleAdmin').addEventListener('click',async()=>{try{await api('/admin/chat-action',{action:'toggle',enabled:!chatEnabled});chatEnabled=!chatEnabled;$('chatToggleAdmin').textContent=chatEnabled?'Sohbeti kapat':'Sohbeti aç';}catch(e){alert(e.message);}});
+$('chatToggleAdmin').addEventListener('click',async()=>{try{await api('/admin/chat-action',{action:'toggle',enabled:!chatEnabled});chatEnabled=!chatEnabled;$('chatToggleAdmin').textContent=chatEnabled?'Sohbeti kapat':'Sohbeti aç';$('chatToggleAdmin').classList.toggle('admin-danger',chatEnabled);$('chatToggleAdmin').classList.toggle('admin-ok',!chatEnabled);$('chatStateLabel').textContent=chatEnabled?'Sohbet açık':'Sohbet kapalı';}catch(e){alert(e.message);}});
 $('clearChat').addEventListener('click',async()=>{if(!confirm('Tüm sohbet mesajları kalıcı olarak silinsin mi?'))return;try{await api('/admin/chat-action',{action:'clear'});await loadChat();}catch(e){alert(e.message);}});
 
 async function showDashboard(){
