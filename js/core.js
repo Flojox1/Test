@@ -6,7 +6,7 @@ import {
   MALE_NAMES, SURNAMES
 } from './data.js';
 import { START_PLOT, getProvince } from './plots.js';
-import { databaseURL } from './config.js';
+import { firebaseConfig } from './config.js';
 import { getFirebaseAuth } from './firebase.js';
 
 /* ---------- YARDIMCI: BOŞ DURUM ---------- */
@@ -65,7 +65,7 @@ function applySave(parsed) {
 }
 
 function cloudSaveUrl(uid, token) {
-  const base = databaseURL.replace(/\/$/, "");
+  const base = firebaseConfig.databaseURL.replace(/\/$/, "");
   return `${base}/users/${encodeURIComponent(uid)}/gameSave.json?auth=${encodeURIComponent(token)}`;
 }
 
