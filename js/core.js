@@ -1,5 +1,5 @@
 import {
-  SAVE_KEY, START_MONEY, BATCH_WEIGHT,
+  START_MONEY, BATCH_WEIGHT,
   MATERIALS, MUSHROOM_TYPES, BASE_RECIPE_COST, BATCH_YIELD_AVG,
   PHASES, METHODS, CONTAINER_LEVELS,
   STAR_SPEED, STAR_SALARY, MASTER_TYPES,
@@ -99,20 +99,13 @@ async function writeCloudSave() {
     const detail = await response.text();
     throw new Error(`Bulut kayıt hatası (${response.status}): ${detail}`);
   }
-
-  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
 }
 
 export function save() {
-  try {
-    state.lastTick = Date.now();
-    const localKey = activeSaveUid ? `${SAVE_KEY}_${activeSaveUid}` : SAVE_KEY;
-    localStorage.setItem(localKey, JSON.stringify(state));
-  } catch (e) {
-    console.warn("Yerel kayıt yapılamadı:", e);
-  }
-
+  // Oyun kayıtları yalnızca Firebase hesabında tutulur.
   if (!activeSaveUid) return;
+
+  state.lastTick = Date.now();
   if (remoteSaveTimer) clearTimeout(remoteSaveTimer);
 
   remoteSaveTimer = setTimeout(() => {
@@ -200,29 +193,15 @@ export async function load(uid) {
     // Yalnızca doğrulanmış bulut kaydı yüklendikten sonra yazmaya izin ver.
     applySave(cloudSave);
     activeSaveUid = uid;
-  } else {
-    if (cloudSave !== null) {
-      throw new Error("Bulut kaydı bulundu ancak okunamadı. Kayıt korunuyor; buluta yazım kapalı.");
-    }
-
-    const localKey = `${SAVE_KEY}_${uid}`;
-    let parsed = null;
-
-    try {
-      const accountLocal = localStorage.getItem(localKey);
-      const legacyLocal = localStorage.getItem(SAVE_KEY);
-      parsed = accountLocal ? JSON.parse(accountLocal) :
-        (legacyLocal ? JSON.parse(legacyLocal) : null);
-    } catch (e) {
-      console.warn("Eski kayıt okunamadı:", e);
-    }
-
-    if (!isValidSave(parsed)) {
-      throw new Error("Bu hesap için bulutta kayıt bulunamadı ve bu cihazda aktarılabilecek eski kayıt yok. Mevcut kayıt güvenliği için otomatik kayıt durduruldu.");
-    }
-
-    applySave(parsed);
+  } else if (cloudSave === null) {
+    // İlk açılışta yeni kayıt oluştur; cihazlar arası local kayıt kullanılmaz.
+    Object.keys(state).forEach(k => delete state[k]);
+    Object.assign(state, makeFreshState());
+    refreshMasterPool();
+    refreshMarket();
     activeSaveUid = uid;
+  } else {
+    throw new Error("Firebase'deki oyun kaydı okunamadı. Kayıt korunuyor ve buluta yazım kapalı.");
   }
 
   const elapsed = Math.max(0, (Date.now() - (state.lastTick || Date.now())) / 1000);
