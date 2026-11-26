@@ -627,19 +627,6 @@ function renderContainerView(cont) {
   
   html += `</div></div>`;
 
-  if (deadBatches.length > 0) {
-    html += `<div class="dead-batches"><div class="dead-title">Temizlenmesi Gerekenler</div>`;
-    deadBatches.forEach(b => {
-      const isBad = b.phase === 'contaminated';
-      html += `
-        <div class="dead-batch">
-          <span>${MUSHROOM_TYPES[b.mushroomType]?.icon || ''} ${MUSHROOM_TYPES[b.mushroomType]?.name || ''} · ${isBad?'❌ Kontamine':'✅ Tükendi'} · Flaş ${b.flush-1}/${MUSHROOM_TYPES[b.mushroomType]?.flushYield.length || 3}</span>
-          <button class="btn btn-danger" data-action="remove" data-id="${b.id}">Kaldır</button>
-        </div>
-      `;
-    });
-    html += `</div>`;
-  }
   tabContent.innerHTML = html;
 }
 
