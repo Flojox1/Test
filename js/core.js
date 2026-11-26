@@ -144,6 +144,12 @@ function normalizeState() {
   if (!state.plots.length) state.plots = [{ id: START_PLOT }];
 
   if (!Array.isArray(state.masters)) state.masters = [];
+  // Eski kayıtlardaki konteyner ataması olmayan ustaları ilk konteynere bağla.
+  state.masters.forEach(m => {
+    if (!state.containers.some(c => Number(c.id) === Number(m.containerId))) {
+      m.containerId = state.containers[0].id;
+    }
+  });
   if (!Array.isArray(state.availableMasters)) state.availableMasters = [];
   if (!state.masterRestart) state.masterRestart = 'stop';
   if (!state.masterMethod) state.masterMethod = 'hot';
@@ -378,23 +384,24 @@ export function generateMaster(type) {
 }
 
 export function refreshMasterPool() {
+  const choicesPerContainer = Math.max(1, state.containers.length) * 2;
   state.availableMasters = [
-    generateMaster('inoculate'),
-    generateMaster('inoculate'),
-    generateMaster('harvest'),
-    generateMaster('harvest')
+    ...Array.from({ length: choicesPerContainer }, () => generateMaster('inoculate')),
+    ...Array.from({ length: choicesPerContainer }, () => generateMaster('harvest'))
   ];
 }
 
 /* ---------- USTA HIZ ---------- */
-export function getSpeedMultiplier(phase) {
+export function getSpeedMultiplier(phase, containerId) {
   let mult = 1;
+  const assignedToContainer = m => containerId == null ||
+    Number(m.containerId) === Number(containerId);
   if (phase === 'incubating') {
-    const m = state.masters.find(x => x.type === 'inoculate');
+    const m = state.masters.find(x => x.type === 'inoculate' && assignedToContainer(x));
     if (m) mult *= STAR_SPEED[m.stars];
   }
   if (phase === 'pinning' || phase === 'fruiting') {
-    const m = state.masters.find(x => x.type === 'harvest');
+    const m = state.masters.find(x => x.type === 'harvest' && assignedToContainer(x));
     if (m) mult *= STAR_SPEED[m.stars];
   }
   return mult;
@@ -409,35 +416,40 @@ export function computeDuration(b) {
       return m.duration * t.prepMult;
     }
     case 'cooling':    return PHASES.cooling.duration * t.coolMult;
-    case 'incubating': return t.incubation / getSpeedMultiplier('incubating');
-    case 'pinning':    return t.pinning    / getSpeedMultiplier('pinning');
-    case 'fruiting':   return t.fruiting   / getSpeedMultiplier('fruiting');
+    case 'incubating': return t.incubation / getSpeedMultiplier('incubating', b.containerId);
+    case 'pinning':    return t.pinning    / getSpeedMultiplier('pinning', b.containerId);
+    case 'fruiting':   return t.fruiting   / getSpeedMultiplier('fruiting', b.containerId);
     case 'resting':    return t.rest;
     default:           return 0;
   }
 }
 
 /* ---------- KONTAMİNASYON RİSKİ ---------- */
-export function contamRiskFor(typeKey, method, level) {
+export function contamRiskFor(typeKey, method, level, containerId) {
   const t = MUSHROOM_TYPES[typeKey] || MUSHROOM_TYPES.oyster;
   const m = METHODS[method] || METHODS.hot;
   const climate = CONTAINER_LEVELS[level || 1].climate;
   const methodFit = (t.methodMult && t.methodMult[method]) || 1;
   let risk = m.risk * methodFit * t.contamMult * (1.3 - climate);
-  const master = state.masters.find(x => x.type === 'inoculate');
-  if (master) risk *= 1 - (master.stars - 1) * 0.02;
-  return Math.min(0.9, Math.max(0, +risk.toFixed(3)));
+  const master = state.masters.find(x =>
+    x.type === 'inoculate' &&
+    (containerId == null || Number(x.containerId) === Number(containerId))
+  );
+  // Usta yıldız başına kontaminasyon riskini %12 azaltır.
+  if (master) risk *= 1 - (master.stars - 1) * 0.12;
+  // Gerçek olasılığı üç basamakta sakla; ekranda yuvarlayıp sahte %0 göstermeyelim.
+  return Math.min(0.9, Math.max(0, +risk.toFixed(4)));
 }
 
 export function currentContamRisk(b) {
   const cont = state.containers.find(c => c.id === b.containerId);
-  return contamRiskFor(b.mushroomType, b.method, cont ? cont.level : 1);
+  return contamRiskFor(b.mushroomType, b.method, cont ? cont.level : 1, b.containerId);
 }
 
 // Yeni parti ekranında gösterilen tahmini risk
 export function estimateContamRisk(typeKey, method, containerId) {
   const cont = state.containers.find(c => c.id === containerId);
-  return contamRiskFor(typeKey, method, cont ? cont.level : 1);
+  return contamRiskFor(typeKey, method, cont ? cont.level : 1, containerId);
 }
 
 /* ---------- İKLİM → VERİM ---------- */
