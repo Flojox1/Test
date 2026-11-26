@@ -313,6 +313,10 @@ async function handleAdminApi(request, env, pathname) {
 }
 
 export default {
+  async scheduled(event, env, ctx) {
+    // Add Cloudflare Cron Trigger: 0 */8 * * * (UTC).
+    ctx.waitUntil(dbRequest('chat', env, 'DELETE'));
+  },
   async fetch(request, env) {
     const origin = request.headers.get("Origin") || "*";
     if (request.method === "OPTIONS") return new Response(null, {
