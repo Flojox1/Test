@@ -1,7 +1,7 @@
 import { getFirebaseApp, getFirebaseAuth } from './firebase.js';
 
 // Cloudflare Worker deploy edildikten sonra workers.dev adresini buraya yaz.
-const AUTH_WORKER_URL = 'https://YOUR-WORKER.YOUR-SUBDOMAIN.workers.dev';
+const AUTH_WORKER_URL = 'https://email.akar4dogukan.workers.dev';
 
 async function callWorker(path, data = {}) {
   const auth = await getFirebaseAuth();
