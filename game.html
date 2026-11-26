@@ -13,6 +13,7 @@
 <body>
 
 <header class="hud">
+  <button class="profile-trigger" id="profileOpen" type="button" aria-label="Profili aç" title="Profil">👤</button>
   <div class="stat"><span class="lbl">Para</span><span class="val gold" id="statMoney">₺0</span></div>
   <div class="stat"><span class="lbl">Gün</span><span class="val" id="statDay">1</span></div>
   <div class="stat"><span class="lbl">Pazar</span><span class="val green" id="statPrice">₺0/kg</span></div>
@@ -40,6 +41,17 @@
 
 <div class="modal-back" id="modalBack">
   <div class="modal" id="modal"></div>
+</div>
+
+<div class="profile-back" id="profileBack" aria-hidden="true">
+  <section class="profile-card" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+    <button class="profile-close" id="profileClose" type="button" aria-label="Profili kapat">×</button>
+    <div class="profile-avatar">👤</div>
+    <h2 id="profileTitle">Oyuncu Profili</h2>
+    <div class="profile-name" id="profileName">Oyuncu</div>
+    <div class="profile-email-label">GMAIL</div>
+    <div class="profile-email" id="profileEmail">—</div>
+  </section>
 </div>
 
 <button class="chat-toggle" id="chatToggle" aria-label="Sohbet">💬<span class="badge" id="chatBadge"></span></button>
