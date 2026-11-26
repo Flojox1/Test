@@ -23,6 +23,7 @@ import { PROVINCES, MAP_VIEWBOX } from './provinces.js';
 import { getProvince, plotPrice } from './plots.js';
 
 import { initChat } from './chat.js';
+import { getFirebaseApp } from './firebase.js';
 
 let activeTab = 'uretim';
 let logicInterval = null;
@@ -1067,12 +1068,19 @@ export function openNewBatchModal(containerId) {
     const recipe = getRecipeForType(selectedType);
     const climate = CONTAINER_LEVELS[cont.level].climate;
     const totalYield = t.flushYield.reduce((a, b) => a + b, 0);
+    const climateMult = climateYieldMult(selectedType, climate);
+    const harvestMaster = state.masters.find(m => m.type === 'harvest' && Number(m.containerId) === Number(cont.id));
+    const yieldBonus = harvestMaster ? 1 + (harvestMaster.stars - 1) * 0.03 : 1;
+    const estimatedKg = totalYield * climateMult * yieldBonus;
+    const estimatedRevenue = estimatedKg * getTypeSalePrice(selectedType);
     let recHtml = `<div class="recipe"><b>${t.latin}</b><br>${t.desc}<br>`;
     recHtml += `<b>Sıcaklık:</b> ${t.temps}<br>`;
     recHtml += `<b>Reçete:</b> ` + Object.entries(recipe)
       .map(([mat, qty]) => `${qty} ${MATERIALS[mat].unit} ${MATERIALS[mat].name}`).join(' · ');
     recHtml += `<br><b>Misel:</b> 0.3 kg (soğutma sonrası)`;
-    recHtml += `<br><b>Flaş:</b> ${t.flushYield.length} · <b>Toplam verim:</b> ~${totalYield.toFixed(1)} kg · <b>Fiyat:</b> ×${t.priceMult.toFixed(2)}</div>`;
+    recHtml += `<br><b>Flaş:</b> ${t.flushYield.length} · <b>Teorik verim:</b> ${totalYield.toFixed(1)} kg`;
+    recHtml += `<br><b>Tahmini hasat:</b> ${estimatedKg.toFixed(2)} kg · <b>Satış fiyatı:</b> ${fmtMoney(getTypeSalePrice(selectedType))}/kg`;
+    recHtml += `<br><b>🌟 Tüm flaşlar sonunda tahmini kazanç:</b> <span style="color:var(--gold);font-weight:800">${fmtMoney(estimatedRevenue)}</span> (kontaminasyon ve pazar değişimi hariç)</div>`;
 
     if (climate < t.climateMin) {
       recHtml += `<div class="hint warn">Bu konteynerin iklimi (%${Math.round(climate*100)}) bu tür için yetersiz (önerilen en az %${Math.round(t.climateMin*100)}). Verim ciddi şekilde düşer; konteyneri yükseltmeyi düşün.</div>`;
@@ -1328,6 +1336,19 @@ function startInterval() {
 /* ---------- INIT ---------- */
 export async function init(uid) {
   await load(uid);
+  try {
+    const app = await getFirebaseApp();
+    const { getDatabase, ref, onValue } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js');
+    const db = getDatabase(app);
+    onValue(ref(db, `users/${uid}/gameSave/money`), snap => {
+      if (!snap.exists()) return;
+      const remoteMoney = Number(snap.val());
+      if (Number.isFinite(remoteMoney) && remoteMoney !== state.money) {
+        state.money = remoteMoney;
+        render();
+      }
+    }, error => console.warn('Canlı bakiye senkronizasyonu başarısız:', error));
+  } catch (error) { console.warn('Canlı bakiye bağlantısı kurulamadı:', error); }
   render();
   setupEvents();
   startInterval();
