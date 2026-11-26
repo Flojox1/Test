@@ -32,7 +32,10 @@ function ensureEconomy() {
   }
   const e = empire.economy;
   if (!Array.isArray(e.businesses)) e.businesses = [];
-  if (!Array.isArray(e.log)) e.log = [];\n  if (!Number.isFinite(Number(e.ordersCompleted))) e.ordersCompleted = 0;\n  if (!Number.isFinite(Number(e.shadowGoods))) e.shadowGoods = 0;\n  if (typeof e.blackMarket !== 'boolean') e.blackMarket = e.ordersCompleted >= 5;
+  if (!Array.isArray(e.log)) e.log = [];
+  if (!Number.isFinite(Number(e.ordersCompleted))) e.ordersCompleted = 0;
+  if (!Number.isFinite(Number(e.shadowGoods))) e.shadowGoods = 0;
+  if (typeof e.blackMarket !== 'boolean') e.blackMarket = e.ordersCompleted >= 5;
   ['day','dirtyBalance','suspicion','audits','lastAuditDay','frozenUntil'].forEach(k => {
     if (!Number.isFinite(Number(e[k]))) e[k] = 0;
   });
@@ -97,6 +100,8 @@ function buyShelterItem(item) {
   const cost = prices[item];
   if (!cost || state.money < cost) { alert('Bunun için yeterli paran yok.'); return; }
   if (item === 'rack' && e.shelter.racks >= 8) return;
+  if (item === 'botanical' && (!e.shelter.fan || e.shelter.racks < 1 || e.shelter.machines.some(m => m.broken))) { alert('Önce en az bir raf ve çalışan fan kurmalısın.'); return; }
+  if (item === 'botanical' && e.shelter.plants.filter(p => p.alive).length >= e.shelter.racks * 3) { alert('Raf kapasitesi dolu. Yeni raf almalısın.'); return; }
   if (item === 'fan' && e.shelter.fan) return;
   if (item === 'desk' && e.shelter.recipeDesk) return;
   state.money -= cost;
@@ -127,7 +132,7 @@ function completeOrder() {
 function processBotanical() {
   const e = ensureEconomy();
   const s = e.shelter;
-  if (!s || !s.recipeDesk || !s.fan || !s.plants.some(p => p.alive && p.ready)) return;
+  if (!s || !s.recipeDesk || !s.fan || s.machines.some(m => m.broken) || !s.plants.some(p => p.alive && p.ready)) { alert('İşleme için masa, çalışan fan ve hazır birim gerekiyor.'); return; }
   const plant = s.plants.find(p => p.alive && p.ready);
   plant.alive = false;
   e.shadowGoods += 1;
@@ -260,7 +265,7 @@ function renderBusinessPanel() {
       '<div class="eb-actions"><button class="btn btn-ghost" data-eb="rack">Raf ₺45.000</button><button class="btn btn-ghost" data-eb="fan">Fan ₺90.000</button><button class="btn btn-ghost" data-eb="desk">İşleme masası ₺125.000</button><button class="btn btn-ghost" data-eb="botanical">Botanik birim ₺18.000</button></div>' +
       '<p>Toplam birim: ' + shelter.plants.length + ' · Büyüme süresi: 7 oyun günü · Rastgele kayıp kontrolü: 30 günde bir</p>' +
       '<button class="btn btn-green" data-eb="process">Hazır birimi işle</button><p>İşlenmiş kurgusal ürün: ' + e.shadowGoods + '</p>' +
-      '<p>Ekipman: ' + shelter.machines.map(m=>m.name + (m.broken?' (Arızalı)':' (Çalışıyor)')).join(' · ') + '</p><button class="btn btn-ghost" data-eb="repairMachine">Ekipmanı onar ₺25.000</button>';
+      '<p>Ekipman: ' + shelter.machines.map(m=>m.name + (m.broken?' (Arızalı)':' (Çalışıyor)')).join(' · ') + '</p><p>Bir bitkinin olgunlaşması 7 oyun günü sürer. Her 30 günde %10 kayıp olasılığı vardır. Ekipmanlarda her 14 günde %5 arıza olasılığı vardır.</p><button class="btn btn-ghost" data-eb="repairMachine">Ekipmanı onar ₺25.000</button>';
   const blackMarketPanel = e.blackMarket
     ? '<h3>Kara Pazar</h3><p>İşlenmiş kurgusal ürün: ' + e.shadowGoods + ' · Gizli bakiye: ' + money(e.dirtyBalance) + '</p><button class="btn btn-green" data-eb="sellShadow" ' + (e.shadowGoods?'':'disabled') + '>Ürünleri sat</button>'
     : '<h3>Kara Pazar</h3><p class="eb-muted">Kara Pazar, beş müşteri siparişini tamamlayınca açılacak.</p>';
