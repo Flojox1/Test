@@ -7,7 +7,9 @@ import {
   hasMaterialsForType, consumeMaterialsForType, getRecipeForType,
   fmt, fmtMoney, generateMaster,
   computeDuration, currentContamRisk, getSpeedMultiplier,
-  advanceOffline
+  advanceOffline,
+  addMushroom, sellFromStock, getTypeSalePrice, getTypeBasePrice,
+  climateYieldMult, estimateContamRisk
 } from './core.js';
 
 import {
@@ -137,7 +139,7 @@ export function createBatch(method, containerId, mushroomType) {
 export function inoculate(id, silent) {
   const b = state.batches.find(x => x.id === id);
   if (!b || b.phase !== 'cooled') return false;
-  if (state.inventory.spawn < 0.3) {
+  if (state.inventory.spawn < 0.3 - 1e-9) {
     if (!silent) alert('0.3 kg misel gerekli.');
     else b.logs.push('⚠️ Misel yok, usta ekemedi.');
     return false;
@@ -154,13 +156,14 @@ export function harvest(id, silent) {
   if (!b || b.phase !== 'ready') return false;
 
   const typeData = MUSHROOM_TYPES[b.mushroomType];
-  // Flaş başına verim düşüşü: 1. Flaş %100, 2. Flaş %60, 3. Flaş %30
-  const flushMultiplier = [1, 0.6, 0.3][b.flush - 1] || 0;
-  const base = typeData.baseYield * flushMultiplier;
-  
+  // Her türün kendi flaş sayısı ve flaş başına verimi var (kg / parti)
+  const flushCount = typeData.flushYield.length;
+  const base = typeData.flushYield[b.flush - 1] || 0;
+
+  // İklim: konteyner türün gereksiniminin altındaysa verim düşer
   const cont = state.containers.find(c => c.id === b.containerId);
   const contLevel = CONTAINER_LEVELS[cont ? cont.level : 1];
-  const climateMult = 0.6 + contLevel.climate * 0.6;
+  const climateMult = climateYieldMult(b.mushroomType, contLevel.climate);
   const harvMaster = state.masters.find(m => m.type === 'harvest');
   const yieldBonus = harvMaster ? 1 + (harvMaster.stars - 1) * 0.03 : 1;
   const yieldKg = +(base * climateMult * yieldBonus).toFixed(2);
@@ -171,15 +174,15 @@ export function harvest(id, silent) {
     return false;
   }
 
-  state.inventory.mushroom += yieldKg;
+  addMushroom(b.mushroomType, yieldKg);
   b.flush += 1;
   b.logs.push(silent
     ? `🍄 Usta hasat etti: ${yieldKg} kg (Flaş ${b.flush - 1}).`
     : `Hasat: ${yieldKg} kg mantar (Flaş ${b.flush - 1}).`);
 
-  if (b.flush > 3) {
+  if (b.flush > flushCount) {
     b.phase = 'spent'; b.progress = 0;
-    b.logs.push('3 flaş tamamlandı. Parti tükendi.');
+    b.logs.push(`${flushCount} flaş tamamlandı. Parti tükendi.`);
     handleBatchRestart(b);
   } else {
     b.phase = 'resting'; b.progress = 0;
@@ -284,7 +287,7 @@ export function processMasters() {
 
   state.batches.forEach(b => {
     if (b.phase === 'cooled' && inoc) {
-      if (state.inventory.spawn < 0.3) {
+      if (state.inventory.spawn < 0.3 - 1e-9) {
         const need = 0.3 - state.inventory.spawn;
         const cost = getMaterialPrice('spawn') * need;
         if (state.money >= cost) {
@@ -333,11 +336,10 @@ export function buyCart() {
   save(); render();
 }
 export function sellMushrooms(qty) {
-  const amount = qty === 'all' ? state.inventory.mushroom : Math.min(qty, state.inventory.mushroom);
+  const total = storageUsed();
+  const amount = qty === 'all' ? total : Math.min(qty, total);
   if (amount <= 0) return;
-  const pricePerKg = getMushroomSalePrice();
-  state.money += amount * pricePerKg;
-  state.inventory.mushroom -= amount;
+  sellFromStock(amount);   // türlere orantılı satar, her türün kendi fiyatıyla
   render(); save();
 }
 
@@ -540,7 +542,7 @@ function renderContainerView(cont) {
       const isBad = b.phase === 'contaminated';
       html += `
         <div class="dead-batch">
-          <span>${isBad?'❌ Kontamine':'✅ Tükendi'} · Flaş ${b.flush-1}/3</span>
+          <span>${MUSHROOM_TYPES[b.mushroomType]?.icon || ''} ${MUSHROOM_TYPES[b.mushroomType]?.name || ''} · ${isBad?'❌ Kontamine':'✅ Tükendi'} · Flaş ${b.flush-1}/${MUSHROOM_TYPES[b.mushroomType]?.flushYield.length || 3}</span>
           <button class="btn btn-danger" data-action="remove" data-id="${b.id}">Kaldır</button>
         </div>
       `;
@@ -559,6 +561,15 @@ export function renderPazar() {
     Malzeme <b>${state.market.materialMult.toFixed(2)}×</b> ·
     Sonraki: <b>${next} gün</b>
   </div>`;
+
+  // Türe göre güncel mantar fiyatları
+  html += `<div class="container-card"><h3>Mantar Fiyatları</h3><span class="lvl">Güncel talep</span>`;
+  Object.entries(MUSHROOM_TYPES).forEach(([key, t]) => {
+    const d = state.market.demand?.[key] ?? 1;
+    const arrow = d >= 1.05 ? ' ▲' : (d <= 0.95 ? ' ▼' : '');
+    html += `<div class="cart-row"><span>${t.icon} ${t.name}</span><span>₺${Math.round(getTypeSalePrice(key))}/kg${arrow}</span></div>`;
+  });
+  html += `</div>`;
 
   html += `<div class="mat-list">`;
   Object.entries(MATERIALS).forEach(([key, m]) => {
@@ -652,7 +663,7 @@ export function renderUstalar() {
   html += `<div style="font-family:var(--font-head);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--green-bright);margin:14px 0 8px">Usta Davranışı</div>`;
   html += `
     <div class="setting-row">
-      <label>Parti Bitince (3. Flaştan Sonra)</label>
+      <label>Parti Bitince (Son Flaştan Sonra)</label>
       <select class="setting-select" id="settingRestart">
         <option value="stop">${RESTART_MODES.stop.name}</option>
         <option value="ifhave">${RESTART_MODES.ifhave.name}</option>
@@ -762,6 +773,11 @@ export function renderDepo() {
     </div>
     <div class="hint">Depo kapasitesi tüm konteynerlerin toplamı. Mantar beklerken bozulmaz.</div>
   `;
+  const stockRows = Object.entries(MUSHROOM_TYPES)
+    .filter(([k]) => (state.stock[k] || 0) > 0.0001)
+    .map(([k, t]) => `<div class="cart-row"><span>${t.icon} ${t.name} · ${state.stock[k].toFixed(1)} kg</span><span>₺${Math.round(getTypeSalePrice(k))}/kg</span></div>`)
+    .join('');
+  if (stockRows) html += `<div class="container-card"><h3>Türe Göre Stok</h3>${stockRows}</div>`;
   tabContent.innerHTML = html;
 }
 
@@ -777,11 +793,11 @@ export function openNewBatchModal(containerId) {
   let html = `
     <h2>Yeni Parti</h2>
     <span class="sub">Konteyner #${cont.id}</span>
-    <div style="display:flex;gap:6px;margin-bottom:12px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px;margin-bottom:12px">
   `;
-  
+
   Object.entries(MUSHROOM_TYPES).forEach(([key, t], idx) => {
-    html += `<button class="btn ${idx===0?'btn-green':'btn-ghost'} type-btn" data-type="${key}" style="flex:1;font-size:0.6rem;padding:8px 4px">${t.icon} ${t.name}</button>`;
+    html += `<button class="btn ${idx===0?'btn-green':'btn-ghost'} type-btn" data-type="${key}" style="font-size:0.6rem;padding:8px 4px;line-height:1.3">${t.icon}<br>${t.name}</button>`;
   });
   html += `</div><div id="recipeBox"></div>`;
 
@@ -793,19 +809,27 @@ export function openNewBatchModal(containerId) {
   // Tür seçim eventleri
   let selectedType = 'oyster';
   const updateRecipe = () => {
+    const t = MUSHROOM_TYPES[selectedType];
     const recipe = getRecipeForType(selectedType);
-    let recHtml = `<div class="recipe"><b>Reçete:</b> `;
-    for (const [mat, qty] of Object.entries(recipe)) {
-      recHtml += `${qty} kg ${MATERIALS[mat].name} · `;
+    const climate = CONTAINER_LEVELS[cont.level].climate;
+    const totalYield = t.flushYield.reduce((a, b) => a + b, 0);
+    let recHtml = `<div class="recipe"><b>${t.latin}</b><br>${t.desc}<br>`;
+    recHtml += `<b>Sıcaklık:</b> ${t.temps}<br>`;
+    recHtml += `<b>Reçete:</b> ` + Object.entries(recipe)
+      .map(([mat, qty]) => `${qty} ${MATERIALS[mat].unit} ${MATERIALS[mat].name}`).join(' · ');
+    recHtml += `<br><b>Misel:</b> 0.3 kg (soğutma sonrası)`;
+    recHtml += `<br><b>Flaş:</b> ${t.flushYield.length} · <b>Toplam verim:</b> ~${totalYield.toFixed(1)} kg · <b>Fiyat:</b> ×${t.priceMult.toFixed(2)}</div>`;
+
+    if (climate < t.climateMin) {
+      recHtml += `<div class="hint warn">Bu konteynerin iklimi (%${Math.round(climate*100)}) bu tür için yetersiz (önerilen en az %${Math.round(t.climateMin*100)}). Verim ciddi şekilde düşer; konteyneri yükseltmeyi düşün.</div>`;
     }
-    recHtml += `<br><b>Misel:</b> 0.3 kg (soğutma sonrası)</div>`;
-    
+
     // Malzeme kontrolü
     let missing = false;
     for (const [mat, qty] of Object.entries(recipe)) {
       if ((state.inventory[mat]||0) < qty) { missing = true; break; }
     }
-    
+
     if (missing) recHtml += `<div class="hint danger">Malzeme eksik.</div>`;
     
     recHtml += `<div style="font-size:0.68rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Pastörizasyon</div>`;
@@ -817,7 +841,7 @@ export function openNewBatchModal(containerId) {
           <div class="m-ico">${m.icon}</div>
           <div class="m-info">
             <div class="m-name">${m.name}</div>
-            <div class="m-desc">${m.desc} · ${m.duration}sn${m.cost?' · +₺'+m.cost:''}</div>
+            <div class="m-desc">${m.desc} · ${Math.round(m.duration * t.prepMult)}sn${m.cost?' · +₺'+m.cost:''} · Risk %${(estimateContamRisk(selectedType, mKey, cont.id)*100).toFixed(1)}</div>
           </div>
         </div>
       `;
@@ -855,7 +879,7 @@ export function openBatchModal(id) {
 
   modalEl.innerHTML = `
     <h2>${typeData.icon} ${typeData.name}</h2>
-    <span class="sub">Konteyner #${b.containerId} · Flaş ${b.flush}/3</span>
+    <span class="sub">Konteyner #${b.containerId} · Flaş ${Math.min(b.flush, typeData.flushYield.length)}/${typeData.flushYield.length}</span>
     <div class="batch-detail">
       <div class="bd-row"><span class="k">Aşama</span><span class="v">${ph.label}</span></div>
       <div class="bd-row"><span class="k">Yöntem</span><span class="v">${METHODS[b.method].name}</span></div>
