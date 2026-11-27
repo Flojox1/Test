@@ -81,6 +81,19 @@ function ensureShelterLayout(shelter) {
   return shelter;
 }
 
+function initializeShelterTimers(shelter){
+  if(Number(shelter?.installed?.fan)<1)return false;
+  let changed=false;
+  for(const rack of shelter.racks||[])for(const slot of rack.units||[])for(const unit of slot){
+    if(unit.nextHarvestTick==null){
+      const remaining=unit.nextHarvestDay==null?7:Math.max(0,Number(unit.nextHarvestDay)-Number(state.day||0));
+      unit.nextHarvestTick=Number(state.tickCount||0)+remaining*12;
+      changed=true;
+    }
+  }
+  return changed;
+}
+
 function renderShelterPage(containerId) {
   activeShelterPageId = Number(containerId);
   activeShelterSubpage = 'shelter';
@@ -93,6 +106,7 @@ function renderShelterPage(containerId) {
     return;
   }
   ensureShelterLayout(shelter);
+  if(initializeShelterTimers(shelter))save();
   const e=economy(), inventory=e.mehmetInventory, installed=shelter.installed, fans=installed.fan, racks=shelter.racks;
   const materialRow = (key, blocked = false) => {
     const item = ITEMS[key], owned = Number(inventory[key]) || 0;
@@ -221,14 +235,7 @@ export function advanceShelterGrowth(){
     const shelter=shelterFor(container.id);
     if(!shelter)continue;
     ensureShelterLayout(shelter);
-    if(shelter.installed.fan<1)continue;
-    for(const rack of shelter.racks)for(const slot of rack.units)for(const unit of slot){
-      if(!Number.isFinite(Number(unit.nextHarvestTick))){
-        const remaining=unit.nextHarvestDay==null?7:Math.max(0,Number(unit.nextHarvestDay)-Number(state.day||0));
-        unit.nextHarvestTick=Number(state.tickCount||0)+remaining*12;
-        changed=true;
-      }
-    }
+    if(initializeShelterTimers(shelter))changed=true;
   }
   if(changed)save();
   if(activeShelterPageId!=null&&activeShelterSubpage==='shelter')renderShelterPage(activeShelterPageId);
