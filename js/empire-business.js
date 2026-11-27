@@ -2,6 +2,7 @@ import { state, save } from './core.js';
 
 const SHELTER_COST = 280000;
 let activeShelterPageId = null;
+let activeShelterSubpage = 'shelter';
 const ORDERS = [
   {
     name: 'İstiridye Mantarı Siparişi',
@@ -82,6 +83,7 @@ function ensureShelterLayout(shelter) {
 
 function renderShelterPage(containerId) {
   activeShelterPageId = Number(containerId);
+  activeShelterSubpage = 'shelter';
   const root = document.getElementById('tabContent');
   const container = getContainer(containerId);
   if (!root || !container) return;
@@ -96,13 +98,14 @@ function renderShelterPage(containerId) {
     const item = ITEMS[key], owned = Number(inventory[key]) || 0;
     return `<div class="shelter-material-row"><span>${item.icon} <b>${item.name}</b><small>Yerleştirilen: ${Number(installed[key]) || 0} · Depoda: ${owned}</small></span><button class="btn btn-green" data-shelter-action="place" data-container="${containerId}" data-item="${key}" ${owned > 0 && !blocked ? '' : 'disabled'}>Yerleştir</button></div>`;
   };
-  const rackHtml=racks.map((rack,ri)=>`<article class="container-card shelter-rack"><h3>🗄️ Yetiştirme Rafı #${ri+1}</h3><div class="shelter-slots">${rack.slots.map((amount,si)=>{const ready=rack.units[si].filter(u=>u.nextHarvestDay!=null&&state.day>=u.nextHarvestDay).length;const growingUnits=rack.units[si].filter(u=>u.nextHarvestDay!=null&&state.day<u.nextHarvestDay);const growing=growingUnits.length;const daysLeft=growing?Math.min(...growingUnits.map(u=>u.nextHarvestDay-state.day)):0;return `<div class="shelter-slot"><b>Slot ${si+1}</b><strong>🌱 ${amount}/2 Özel Botanik Birimi</strong><small>${fans===0?'Havalandırma gerekli':ready?`Hasada hazır: ${ready} · ${(ready*.1).toFixed(1)} kg yaprak${growing?` · ${growing} birim için ${daysLeft} oyun günü kaldı`:''}`:growing?`${growing} birim büyüyor · Hasada ${daysLeft} oyun günü kaldı`:'Birim bekleniyor'}</small><button class="btn btn-green" data-shelter-action="harvest" data-container="${containerId}" data-rack="${ri}" data-slot="${si}" ${ready?'':'disabled'}>Hasat Et</button><button class="btn btn-ghost" data-shelter-action="place-botanical" data-container="${containerId}" data-rack="${ri}" data-slot="${si}" ${Number(inventory.botanical)>0&&amount<2?'':'disabled'}>Botanik Birimi Yerleştir</button></div>`;}).join('')}</div></article>`).join('');
+  const rackHtml=racks.map((rack,ri)=>`<article class="container-card shelter-rack"><h3>🗄️ Yetiştirme Rafı #${ri+1}</h3><div class="shelter-slots">${rack.slots.map((amount,si)=>{const ready=rack.units[si].filter(u=>u.nextHarvestTick!=null&&state.tickCount>=u.nextHarvestTick).length;const growingUnits=rack.units[si].filter(u=>u.nextHarvestTick!=null&&state.tickCount<u.nextHarvestTick);const growing=growingUnits.length;const ticksLeft=growing?Math.min(...growingUnits.map(u=>u.nextHarvestTick-state.tickCount)):0;const daysLeft=growing?Math.ceil(ticksLeft/12):0;const progress=growing?Math.max(0,Math.min(100,((84-ticksLeft)/84)*100)):ready?100:0;return `<div class="shelter-slot"><b>Slot ${si+1}</b><strong>🌱 ${amount}/2 Özel Botanik Birimi</strong><small>${fans===0?'Havalandırma gerekli':ready?`HASADA HAZIR: ${ready} · ${(ready*.1).toFixed(1)} kg yaprak${growing?` · Diğer ${growing} birim: ${daysLeft} oyun günü`:''}`:growing?`${growing} birim büyüyor · HASADA ${daysLeft} OYUN GÜNÜ KALDI`:'Birim bekleniyor'}</small><div class="botanical-progress"><i style="width:${progress}%"></i></div><button class="btn btn-green" data-shelter-action="harvest" data-container="${containerId}" data-rack="${ri}" data-slot="${si}" ${ready?'':'disabled'}>Hasat Et</button><button class="btn btn-ghost" data-shelter-action="place-botanical" data-container="${containerId}" data-rack="${ri}" data-slot="${si}" ${Number(inventory.botanical)>0&&amount<2?'':'disabled'}>Botanik Birimi Yerleştir</button></div>`;}).join('')}</div></article>`).join('');
   const prep=installed.workbench>0?`<div class="container-card shelter-materials"><h3>🛠️ Hazırlık Masası</h3><p>Sihirli Yaprak: ${Number(e.sihirliYaprakKg).toFixed(2)} kg · Sihirli Toz: ${Number(e.sihirliTozKg).toFixed(2)} kg</p><p class="hint">1 kg yaprak = 0,4 kg toz.</p><input id="magicLeafAmount" type="number" min="0.01" step="0.01" value="0.25" max="${Number(e.sihirliYaprakKg).toFixed(2)}"><button class="btn btn-green" data-shelter-action="process-leaves" data-container="${containerId}" ${Number(e.sihirliYaprakKg)>=.01?'':'disabled'}>Sihirli Toz Hazırla</button></div>`:'';
   const tuco=e.mehmetSampleDelivered?`<div class="container-card shelter-goto"><h3>Tuco Salamanca</h3><button class="btn btn-green" data-shelter-action="visit-tuco" data-container="${containerId}">Tuco'ya Git →</button></div>`:'';
   root.innerHTML=`<div class="section-head"><h2>Konteyner #${containerId} · Sığınak</h2><button class="btn btn-ghost" data-action="exitShelter" data-container="${containerId}">← Üretime Dön</button></div><div class="container-card shelter-goto"><h3>Mehmet Reis</h3><p class="hint">Siparişleri tamamladıkça Mehmet Reis'in malzeme kataloğu açılır.</p><button class="btn btn-green" data-shelter-action="visit-mehmet" data-container="${containerId}">Mehmet Reis'e Git →</button></div>${tuco}${prep}<div class="container-card shelter-materials"><h3>Sığınak Ekipmanları</h3>${materialRow('rack',racks.length>=8)}${materialRow('fan')}${materialRow('workbench',installed.workbench>=1)}<p class="hint">Raf: ${racks.length}/8 · Havalandırma: ${fans} · Hazırlık tezgâhı: ${installed.workbench}/1</p>${fans===0?'<p class="shelter-warning">Havalandırma olmadan büyüme başlamaz.</p>':'<p class="shelter-ready">Havalandırma aktif.</p>'}</div><div class="container-card shelter-materials"><h3>Yetiştirme Rafları · ${racks.length}/8</h3>${racks.length?rackHtml:'<p class="hint">Henüz raf yerleştirmedin.</p>'}<button class="btn btn-green shelter-fill-all" data-shelter-action="fill-all" data-container="${containerId}" ${racks.length===0||Number(inventory.botanical)<1?'disabled':''}>Tüm Slotları Doldur</button></div>`;
 }
 function renderMehmetPage(containerId) {
-  activeShelterPageId = null;
+  activeShelterPageId = Number(containerId);
+  activeShelterSubpage = 'mehmet';
   const root = document.getElementById('tabContent');
   if (!root) return;
   const e = economy();
@@ -192,11 +195,11 @@ function placeMaterial(containerId, itemKey) {
   if (itemKey === 'workbench' && shelter.installed.workbench >= 1) { alert('Bir sığınağa yalnızca 1 hazırlık tezgâhı yerleştirilebilir.'); return; }
   e.mehmetInventory[itemKey] = available - 1;
   if (itemKey === 'rack') { shelter.racks.push({ id: shelter.racks.length + 1, slots: [0, 0], units:[[],[]] }); shelter.installed.rack = shelter.racks.length; }
-  else { shelter.installed[itemKey]=(Number(shelter.installed[itemKey])||0)+1; if(itemKey==='fan')shelter.racks.forEach(r=>r.units?.forEach(slot=>slot.forEach(u=>{if(u.nextHarvestDay==null)u.nextHarvestDay=state.day+7;}))); }
+  else { shelter.installed[itemKey]=(Number(shelter.installed[itemKey])||0)+1; if(itemKey==='fan')shelter.racks.forEach(r=>r.units?.forEach(slot=>slot.forEach(u=>{if(u.nextHarvestTick==null){const remaining=u.nextHarvestDay==null?7:Math.max(0,Number(u.nextHarvestDay)-state.day);u.nextHarvestTick=state.tickCount+remaining*12;}}))); }
   save(); renderShelterPage(containerId);
 }
 
-function fillAllBotanicalSlots(id){const s=shelterFor(id);if(!s)return;ensureShelterLayout(s);const e=economy();let left=Math.max(0,Math.floor(Number(e.mehmetInventory.botanical)||0)),placed=0;for(const r of s.racks)for(let i=0;i<2&&left>0;i++){const n=Math.min(2-r.slots[i],left);for(let j=0;j<n;j++)r.units[i].push({nextHarvestDay:s.installed.fan>0?state.day+7:null});r.slots[i]+=n;left-=n;placed+=n;}if(!placed){alert('Boş slot yok veya botanik birimi yok.');return;}e.mehmetInventory.botanical-=placed;save();renderShelterPage(id);}
+function fillAllBotanicalSlots(id){const s=shelterFor(id);if(!s)return;ensureShelterLayout(s);const e=economy();let left=Math.max(0,Math.floor(Number(e.mehmetInventory.botanical)||0)),placed=0;for(const r of s.racks)for(let i=0;i<2&&left>0;i++){const n=Math.min(2-r.slots[i],left);for(let j=0;j<n;j++)r.units[i].push({nextHarvestDay:s.installed.fan>0?state.day+7:null,nextHarvestTick:s.installed.fan>0?state.tickCount+84:null});r.slots[i]+=n;left-=n;placed+=n;}if(!placed){alert('Boş slot yok veya botanik birimi yok.');return;}e.mehmetInventory.botanical-=placed;save();renderShelterPage(id);}
 function placeBotanical(containerId, rackIndex, slotIndex) {
   const shelter = shelterFor(containerId);
   if (!shelter) return;
@@ -206,14 +209,42 @@ function placeBotanical(containerId, rackIndex, slotIndex) {
   const e = economy();
   if ((Number(e.mehmetInventory.botanical) || 0) < 1) { alert('Depoda Özel Botanik Birimi yok. Önce Mehmet Reis ile konuş.'); return; }
   if (rack.slots[slot] >= 2) { alert('Bu slotta en fazla 2 Özel Botanik Birimi bulunabilir.'); return; }
-  e.mehmetInventory.botanical -= 1; rack.slots[slot] += 1; rack.units[slot].push({nextHarvestDay:shelter.installed.fan>0?state.day+7:null});
+  e.mehmetInventory.botanical -= 1; rack.slots[slot] += 1; rack.units[slot].push({nextHarvestDay:shelter.installed.fan>0?state.day+7:null,nextHarvestTick:shelter.installed.fan>0?state.tickCount+84:null});
   save(); renderShelterPage(containerId);
 }
 function processMagicLeaves(id){const s=shelterFor(id),e=economy();if(!s||s.installed.workbench<1)return;const kg=Math.round(Number(document.getElementById('magicLeafAmount')?.value)*100)/100;if(!Number.isFinite(kg)||kg<=0||kg>Number(e.sihirliYaprakKg)+1e-9){alert('Geçerli yaprak miktarı gir.');return;}e.sihirliYaprakKg=+(Number(e.sihirliYaprakKg)-kg).toFixed(2);e.sihirliTozKg=+(Number(e.sihirliTozKg)+kg*.4).toFixed(3);save();renderShelterPage(id);}
 function deliverSample(id){const e=economy();if(e.mehmetSampleDelivered||Number(e.sihirliTozKg)<.1)return;e.sihirliTozKg=+(Number(e.sihirliTozKg)-.1).toFixed(3);e.mehmetSampleDelivered=true;save();renderMehmetPage(id);}
-function visitTuco(id){const e=economy(),root=document.getElementById('tabContent');if(!root)return;if(!e.mehmetSampleDelivered){renderMehmetPage(id);return;}root.innerHTML='<div class="section-head"><h2>Tuco Salamanca</h2><button class="btn btn-ghost" data-action="exitShelter" data-container="'+id+'">← Sığınağa Dön</button></div><div class="container-card"><h3>Tuco</h3><p>Mehmet Reis seni bana gönderdi.</p><p>Satışa hazır Sihirli Toz: <b>'+Number(e.sihirliTozKg).toFixed(2)+' kg</b></p><p class="hint">Satış fiyatı belirlendiğinde satış işlemini burada etkinleştireceğiz.</p></div>';}
-export function advanceShelterGrowth(){let changed=false;for(const c of state.containers||[]){const sh=shelterFor(c.id);if(!sh)continue;ensureShelterLayout(sh);if(sh.installed.fan<1)continue;for(const rack of sh.racks)for(const slot of rack.units)for(const u of slot){if(u.nextHarvestDay==null){u.nextHarvestDay=state.day+7;changed=true;}}}if(changed)save();if(activeShelterPageId!=null)renderShelterPage(activeShelterPageId);}
-function harvestBotanicals(id,ri,si){const s=shelterFor(id);if(!s)return;ensureShelterLayout(s);const r=s.racks[Number(ri)],slot=Number(si);if(!r||![0,1].includes(slot))return;const ready=r.units[slot].filter(u=>u.nextHarvestDay!=null&&state.day>=u.nextHarvestDay);if(!ready.length)return;const e=economy();e.sihirliYaprakKg=+(Number(e.sihirliYaprakKg)+ready.length*.1).toFixed(2);ready.forEach(u=>u.nextHarvestDay=state.day+7);save();renderShelterPage(id);}
+function visitTuco(id){const e=economy(),root=document.getElementById('tabContent');if(!root)return;activeShelterPageId=Number(id);activeShelterSubpage='tuco';if(!e.mehmetSampleDelivered){renderMehmetPage(id);return;}root.innerHTML='<div class="section-head"><h2>Tuco Salamanca</h2><button class="btn btn-ghost" data-action="exitShelter" data-container="'+id+'">← Sığınağa Dön</button></div><div class="container-card"><h3>Tuco</h3><p>Mehmet Reis seni bana gönderdi.</p><p>Satışa hazır Sihirli Toz: <b>'+Number(e.sihirliTozKg).toFixed(2)+' kg</b></p><p class="hint">Satış fiyatı belirlendiğinde satış işlemini burada etkinleştireceğiz.</p></div>';}
+export function advanceShelterGrowth(){
+  let changed=false;
+  for(const container of state.containers||[]){
+    const shelter=shelterFor(container.id);
+    if(!shelter)continue;
+    ensureShelterLayout(shelter);
+    if(shelter.installed.fan<1)continue;
+    for(const rack of shelter.racks)for(const slot of rack.units)for(const unit of slot){
+      if(!Number.isFinite(Number(unit.nextHarvestTick))){
+        const remaining=unit.nextHarvestDay==null?7:Math.max(0,Number(unit.nextHarvestDay)-Number(state.day||0));
+        unit.nextHarvestTick=Number(state.tickCount||0)+remaining*12;
+        changed=true;
+      }
+    }
+  }
+  if(changed)save();
+  if(activeShelterPageId!=null&&activeShelterSubpage==='shelter')renderShelterPage(activeShelterPageId);
+}
+export function handleShelterBack(){
+  if(activeShelterPageId==null)return false;
+  if(activeShelterSubpage==='mehmet'||activeShelterSubpage==='tuco'){
+    renderShelterPage(activeShelterPageId);
+    return true;
+  }
+  activeShelterPageId=null;
+  return false;
+}
+export function leaveShelterPage(){activeShelterPageId=null;activeShelterSubpage='shelter';}
+
+function harvestBotanicals(id,ri,si){const s=shelterFor(id);if(!s)return;ensureShelterLayout(s);const r=s.racks[Number(ri)],slot=Number(si);if(!r||![0,1].includes(slot))return;const ready=r.units[slot].filter(u=>u.nextHarvestTick!=null&&state.tickCount>=u.nextHarvestTick);if(!ready.length)return;const e=economy();e.sihirliYaprakKg=+(Number(e.sihirliYaprakKg)+ready.length*.1).toFixed(2);ready.forEach(u=>{u.nextHarvestDay=state.day+7;u.nextHarvestTick=state.tickCount+84;});save();renderShelterPage(id);}
 export function openShelterPage(containerId) {
   renderShelterPage(containerId);
 }
@@ -231,7 +262,7 @@ export function initEmpireBusiness() {
     .shelter-order .eb-actions .btn{flex:1}
     .shelter-order .btn:disabled,.shelter-material-row .btn:disabled{opacity:.45;cursor:not-allowed}
     .shelter-goto,.shelter-materials{margin-top:12px}
-    .shelter-rack{margin-top:10px}.shelter-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}.shelter-slot{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2,transparent)}.shelter-slot strong{font-size:.8rem}.shelter-slot small,.shelter-warning,.shelter-ready{font-size:.7rem;color:var(--muted)}.shelter-warning{color:#d98b32}.shelter-ready{color:#36a66a}.shelter-slot .btn{width:100%;white-space:normal}
+    .botanical-progress{height:6px;border-radius:99px;background:var(--border);overflow:hidden}.botanical-progress i{display:block;height:100%;background:#36a66a;transition:width .2s}.shelter-rack{margin-top:10px}.shelter-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}.shelter-slot{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2,transparent)}.shelter-slot strong{font-size:.8rem}.shelter-slot small,.shelter-warning,.shelter-ready{font-size:.7rem;color:var(--muted)}.shelter-warning{color:#d98b32}.shelter-ready{color:#36a66a}.shelter-slot .btn{width:100%;white-space:normal}
     .shelter-goto .btn{width:100%;margin-top:12px}
     .shelter-buy-controls{display:flex;gap:6px;align-items:center}.shelter-qty{width:76px;min-width:0;padding:9px;background:#090c08;border:1px solid var(--border);color:var(--text);border-radius:6px}.shelter-cart-total{font-weight:800;text-align:right;padding:12px 0}.shelter-checkout,.shelter-fill-all{width:100%;margin-top:10px}
     .shelter-material-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
