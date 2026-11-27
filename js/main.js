@@ -122,7 +122,7 @@ try {
     await init(user.uid);
     initEmpireBusiness();
     history.replaceState({floRodApp:true,level:0},'',location.href); history.pushState({floRodApp:true,level:1},'',location.href);
-    window.addEventListener('popstate',()=>{const p=document.getElementById('profileBack');if(isChatOpen())closeChat();else if(p?.classList.contains('open')){p.classList.remove('open');p.setAttribute('aria-hidden','true');}else if(document.getElementById('modalBack')?.classList.contains('on'))closeModal();else if(!handleShelterBack())handleGameBack();history.pushState({floRodApp:true,level:1},'',location.href);});
+    window.addEventListener('popstate',event=>{event.preventDefault();const p=document.getElementById('profileBack');if(isChatOpen())closeChat();else if(p?.classList.contains('open')){p.classList.remove('open');p.setAttribute('aria-hidden','true');}else if(document.getElementById('modalBack')?.classList.contains('on'))closeModal();else if(!handleShelterBack())handleGameBack();history.pushState({floRodApp:true,level:1},'',location.href);});
   }
 } catch (error) {
   console.error('Oyun başlatılamadı:', error);
