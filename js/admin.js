@@ -10,7 +10,7 @@ function parseAdminMoney(input){
 import { getFirebaseApp, getFirebaseAuth } from './firebase.js';
 const WORKER='https://email.akar4dogukan.workers.dev';
 const $=id=>document.getElementById(id);
-let dbMod=null, chatEnabled=true;
+let dbMod=null, chatEnabled=true, playersCache=[];
 async function auth(){return getFirebaseAuth();}
 async function api(path,body){
  const a=await auth(),u=a.currentUser;if(!u)throw new Error('Admin oturumu kapandı.');
@@ -32,26 +32,35 @@ async function loadPlayers(){
  $('playersList').textContent='Yükleniyor...';
  try{
   const d=await api('/admin/players');
-  $('playersList').innerHTML='';
-  if(!d.players.length){$('playersList').textContent='Henüz oyuncu kaydı yok.';return;}
-  d.players.forEach(p=>{
-   const row=document.createElement('div');row.className='admin-row';
-   const info=document.createElement('div');
-   const name=document.createElement('b');name.textContent=p.name;
-   const meta=document.createElement('div');meta.className='admin-muted';meta.textContent=(p.email||p.uid)+' · ₺'+Number(p.money).toLocaleString('tr-TR');
-   info.append(name,meta);
-   const actions=document.createElement('div');actions.className='admin-actions';
-   const money=document.createElement('button');money.className='btn btn-green';money.textContent='Para ekle';
-   money.onclick=async()=>{const raw=prompt('Eklenecek para miktarı (ör. 1500, 1.5b, 2.78m, 1mr):','1000');if(raw===null)return;const amount=parseAdminMoney(raw);if(!Number.isFinite(amount)||amount<=0){alert('Geçersiz miktar. Örnek: 1.5b = 1.500, 2.78m = 2.780.000, 1mr = 1.000.000.000');return;}money.disabled=true;try{await api('/admin/player-action',{action:'addMoney',uid:p.uid,amount});p.money=Number(p.money||0)+amount;meta.textContent=(p.email||p.uid)+' · ₺'+Number(p.money).toLocaleString('tr-TR');money.textContent='Eklendi ✓';setTimeout(()=>{money.textContent='Para ekle';money.disabled=false;},900);}catch(e){money.disabled=false;alert(e.message);}};
-   const reset=document.createElement('button');reset.className='btn btn-ghost';reset.textContent='Sıfırla';
-   reset.onclick=async()=>{if(!confirm(p.name+' oyuncusunun oyun kaydı sıfırlansın mı?'))return;try{await api('/admin/player-action',{action:'reset',uid:p.uid});await loadPlayers();}catch(e){alert(e.message);}};
-   const ban=document.createElement('button');ban.className='btn admin-danger';ban.textContent='Banla';
-   ban.onclick=async()=>{if(!confirm(p.name+' hesabı banlansın mı?'))return;try{await api('/admin/player-action',{action:'ban',uid:p.uid});await loadPlayers();}catch(e){alert(e.message);}};
-   const unban=document.createElement('button');unban.className='btn btn-ghost';unban.textContent='Banı kaldır';
-   unban.onclick=async()=>{try{await api('/admin/player-action',{action:'unban',uid:p.uid});alert('Ban kaldırıldı.');}catch(e){alert(e.message);}};
-   actions.append(money,reset,ban,unban);row.append(info,actions);$('playersList').append(row);
-  });
+  playersCache=d.players||[];
+  renderPlayers();
  }catch(e){$('playersList').textContent=e.message;}
+}
+function renderPlayers(){
+ $('playersList').innerHTML='';
+ const query=String($('playerSearch')?.value||'').trim().toLocaleLowerCase('tr-TR');
+ const filtered=playersCache.filter(p=>String(p.name||'').toLocaleLowerCase('tr-TR').includes(query));
+ if(!filtered.length){$('playersList').textContent=playersCache.length?'Aramayla eşleşen oyuncu yok.':'Henüz oyuncu kaydı yok.';return;}
+ filtered.forEach(p=>{
+  const row=document.createElement('div');row.className='admin-row';
+  const info=document.createElement('div');
+  const name=document.createElement('b');name.textContent=p.name;
+  const meta=document.createElement('div');meta.className='admin-muted';
+  const updateMeta=()=>{meta.textContent=(p.email||p.uid)+' · ₺'+Number(p.money||0).toLocaleString('tr-TR');};
+  updateMeta();info.append(name,meta);
+  const actions=document.createElement('div');actions.className='admin-actions';
+  const money=document.createElement('button');money.className='btn btn-green';money.textContent='Para ekle';
+  money.onclick=async()=>{const raw=prompt('Eklenecek para miktarı (ör. 1500, 1.5b, 2.78m, 1mr):','1000');if(raw===null)return;const amount=parseAdminMoney(raw);if(!Number.isFinite(amount)||amount<=0){alert('Geçersiz miktar.');return;}money.disabled=true;try{const result=await api('/admin/player-action',{action:'addMoney',uid:p.uid,amount});p.money=Number(result.money);updateMeta();money.textContent='Eklendi ✓';setTimeout(()=>{money.textContent='Para ekle';money.disabled=false;},900);}catch(e){money.disabled=false;alert(e.message);}};
+  const removeMoney=document.createElement('button');removeMoney.className='btn admin-danger';removeMoney.textContent='Para çıkar';
+  removeMoney.onclick=async()=>{const raw=prompt('Çıkarılacak para miktarı (ör. 1500, 1.5b, 2.78m, 1mr):','1000');if(raw===null)return;const amount=parseAdminMoney(raw);if(!Number.isFinite(amount)||amount<=0){alert('Geçersiz miktar.');return;}if(!confirm(p.name+' oyuncusundan ₺'+amount.toLocaleString('tr-TR')+' çıkarılsın mı?'))return;removeMoney.disabled=true;try{const result=await api('/admin/player-action',{action:'removeMoney',uid:p.uid,amount});p.money=Number(result.money);updateMeta();removeMoney.textContent='Çıkarıldı ✓';setTimeout(()=>{removeMoney.textContent='Para çıkar';removeMoney.disabled=false;},900);}catch(e){removeMoney.disabled=false;alert(e.message);}};
+  const reset=document.createElement('button');reset.className='btn btn-ghost';reset.textContent='Sıfırla';
+  reset.onclick=async()=>{if(!confirm(p.name+' oyuncusunun oyun kaydı sıfırlansın mı?'))return;try{await api('/admin/player-action',{action:'reset',uid:p.uid});await loadPlayers();}catch(e){alert(e.message);}};
+  const ban=document.createElement('button');ban.className='btn admin-danger';ban.textContent='Banla';
+  ban.onclick=async()=>{if(!confirm(p.name+' hesabı banlansın mı?'))return;try{await api('/admin/player-action',{action:'ban',uid:p.uid});await loadPlayers();}catch(e){alert(e.message);}};
+  const unban=document.createElement('button');unban.className='btn btn-ghost';unban.textContent='Banı kaldır';
+  unban.onclick=async()=>{try{await api('/admin/player-action',{action:'unban',uid:p.uid});alert('Ban kaldırıldı.');}catch(e){alert(e.message);}};
+  actions.append(money,removeMoney,reset,ban,unban);row.append(info,actions);$('playersList').append(row);
+ });
 }
 async function loadChat(){
  $('chatList').textContent='Yükleniyor...';
@@ -75,6 +84,7 @@ async function loadChat(){
 }
 $('adminLogin').addEventListener('submit',login);
 $('refreshPlayers').addEventListener('click',loadPlayers);
+$('playerSearch').addEventListener('input',renderPlayers);
 $('adminLogout').addEventListener('click',async()=>{const a=await auth();await (await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js')).signOut(a);$('dashboard').hidden=true;$('loginCard').hidden=false;});
 let chatPoll=null;document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-admin-tab]').forEach(x=>x.classList.toggle('active',x===b));$('playersPane').hidden=b.dataset.adminTab!=='players';$('chatPane').hidden=b.dataset.adminTab!=='chat';if(b.dataset.adminTab==='chat'){loadChat();if(chatPoll)clearInterval(chatPoll);chatPoll=setInterval(()=>{if(!document.hidden&&!$('chatPane').hidden)loadChat();},4000);}else if(chatPoll){clearInterval(chatPoll);chatPoll=null;}}));
 $('chatToggleAdmin').addEventListener('click',async()=>{try{await api('/admin/chat-action',{action:'toggle',enabled:!chatEnabled});chatEnabled=!chatEnabled;$('chatToggleAdmin').textContent=chatEnabled?'Sohbeti kapat':'Sohbeti aç';$('chatToggleAdmin').classList.toggle('admin-danger',chatEnabled);$('chatToggleAdmin').classList.toggle('admin-ok',!chatEnabled);$('chatStateLabel').textContent=chatEnabled?'Sohbet açık':'Sohbet kapalı';}catch(e){alert(e.message);}});
