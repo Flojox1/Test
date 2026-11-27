@@ -831,11 +831,11 @@ function renderContainerView(cont) {
         <button class="x-btn" data-action="exitContainer" aria-label="Geri">×</button>
         <div class="title-block">
           <h3>Konteyner #${cont.id}</h3>
-          <div class="name">${getProvince(cont.plotId)?.name || ''} · ${cont.districtName || 'Başlangıç alanı'} · ${lvl.name} · Sv.${cont.level}</div>
+          <div class="name">${getProvince(cont.plotId)?.name || ''}${cont.districtName ? ' · ' + cont.districtName : ''} · ${lvl.name} · Sv.${cont.level}</div>
         </div>
       </div>
       <div class="eb-actions">
-        <button class="btn btn-ghost" data-action="openShelter" data-container="${cont.id}">🕳️ Sığınak</button>
+        ${state.empire?.transitionOffer?.purchased ? '<button class="btn btn-ghost" data-action="openShelter" data-container="' + cont.id + '">🕳️ Sığınak</button>' : ''}
         ${next ? `<button class="btn btn-green" data-action="openUpgrade" data-id="${cont.id}">Yükselt</button>` : ''}
       </div>
     </div>
@@ -966,7 +966,7 @@ function plotPanelHtml(p) {
   const have = plotContainers(p.plate).length;
   const canBuy = state.money >= price;
   let districtSection = '';
-  if (state.empire?.unlocked && owned) {
+  if (state.empire?.unlocked && state.empire?.transitionOffer?.purchased && owned) {
     if (!plotDistrictCache.has(p.plate) && !plotDistrictLoading.has(p.plate)) ensurePlotDistricts(p.plate);
     const districts = plotDistrictCache.get(p.plate) || [];
     if (plotDistrictLoading.has(p.plate) || (!districts.length && !plotDistrictCache.has(p.plate))) {
