@@ -25,7 +25,7 @@ import { START_PLOT, getProvince, plotPrice } from './plots.js';
 import { initChat } from './chat.js';
 import { getFirebaseApp } from './firebase.js';
 import { createCharacter } from './empire.js';
-import { openShelterPage, advanceShelterGrowth } from './empire-business.js';
+import { openShelterPage, advanceShelterGrowth, leaveShelterPage } from './empire-business.js';
 
 let activeTab = 'uretim';
 let logicInterval = null;
@@ -1492,11 +1492,28 @@ export function openUpgradeModal(containerId) {
 
 export function closeModal() { modalBack.classList.remove('on'); }
 
+export function handleGameBack(){
+  if(modalBack?.classList.contains('on')){closeModal();return true;}
+  if(state.empire?.unlocked&&state.empire?.world?.setupComplete&&document.body.classList.contains('empire-mode'))return false;
+  if(activeTab!=='uretim'){
+    activeTab='uretim';
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='uretim'));
+    render();
+    return true;
+  }
+  if(uretimView==='container'&&viewingContainerId!=null){
+    uretimView='list';viewingContainerId=null;renderUretim();return true;
+  }
+  if(selectedPlate!=null){selectedPlate=null;renderArsalar();return true;}
+  return false;
+}
+
 /* ---------- EVENTS ---------- */
 export function setupEvents() {
   document.getElementById('tabs').addEventListener('click', (e) => {
     const btn = e.target.closest('.tab');
     if (!btn) return;
+    leaveShelterPage();
     activeTab = btn.dataset.tab;
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
     render();
@@ -1519,6 +1536,7 @@ export function setupEvents() {
     }
     else if (a === 'openShelter') openShelterPage(parseInt(btn.dataset.container));
     else if (a === 'exitShelter') {
+      leaveShelterPage();
       uretimView = 'container';
       viewingContainerId = parseInt(btn.dataset.container);
       renderUretim();
