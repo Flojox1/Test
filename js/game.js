@@ -25,6 +25,7 @@ import { START_PLOT, getProvince, plotPrice } from './plots.js';
 import { initChat } from './chat.js';
 import { getFirebaseApp } from './firebase.js';
 import { createCharacter } from './empire.js';
+import { openShelterPage } from './empire-business.js';
 
 let activeTab = 'uretim';
 let logicInterval = null;
@@ -600,11 +601,6 @@ export function renderHUD() {
 }
 
 export function render() {
-  if (state.empire?.unlocked) {
-    if (state.empire.world?.setupComplete) renderEmpireHome();
-    else renderEmpireSetup();
-    return;
-  }
   document.body.classList.remove('empire-mode');
   document.querySelector('.hud')?.removeAttribute('hidden');
   document.getElementById('tabs')?.removeAttribute('hidden');
@@ -619,7 +615,6 @@ export function render() {
 
 // Not: Arsalar sekmesi canlı yenilenmez (harita her saniye yeniden çizilmesin diye).
 export function renderLive() {
-  if (state.empire?.unlocked) return;
   renderHUD();
   if (activeTab === 'uretim') {
     if (uretimView === 'container' && viewingContainerId != null) {
@@ -788,10 +783,13 @@ function renderContainerView(cont) {
         <button class="x-btn" data-action="exitContainer" aria-label="Geri">×</button>
         <div class="title-block">
           <h3>Konteyner #${cont.id}</h3>
-          <div class="name">${getProvince(cont.plotId)?.name || ''} · ${lvl.name} · Sv.${cont.level}</div>
+          <div class="name">${getProvince(cont.plotId)?.name || ''} · ${cont.districtName || 'Başlangıç alanı'} · ${lvl.name} · Sv.${cont.level}</div>
         </div>
       </div>
-      ${next ? `<button class="btn btn-green" data-action="openUpgrade" data-id="${cont.id}">Yükselt</button>` : ''}
+      <div class="eb-actions">
+        <button class="btn btn-ghost" data-action="openShelter" data-container="${cont.id}">🕳️ Sığınak</button>
+        ${next ? `<button class="btn btn-green" data-action="openUpgrade" data-id="${cont.id}">Yükselt</button>` : ''}
+      </div>
     </div>
     
     <div class="container-detail">
@@ -1436,6 +1434,7 @@ export function setupEvents() {
       viewingContainerId = null;
       renderUretim();
     }
+    else if (a === 'openShelter') openShelterPage(parseInt(btn.dataset.container));
     else if (a === 'openUpgrade') openUpgradeModal(parseInt(btn.dataset.id));
     else if (a === 'openBatch') openBatchModal(parseFloat(btn.dataset.id));
     else if (a === 'newBatchIn') openNewBatchModal(parseInt(btn.dataset.container));
@@ -1476,32 +1475,17 @@ export function setupEvents() {
       const offerPrice = 2500000;
       if (state.empire?.transitionOffer?.purchased) { alert('Bu özel fırsatı zaten satın aldın.'); return; }
       if (state.money < offerPrice) { alert('Bu fırsat için ₺2.500.000 gerekiyor.'); return; }
-      if (!confirm('₺2.500.000 karşılığında özel fırsatı satın almak ve yeni simülasyon dönemini başlatmak istiyor musun?')) return;
+      if (!confirm('₺2.500.000 karşılığında yeni arsa, konteyner ve sığınak sistemlerinin kilidini açmak istiyor musun? Mevcut mantar oyunun aynen devam edecek.')) return;
       state.money -= offerPrice;
       state.empire = state.empire || {};
       state.empire.unlocked = true;
       state.empire.transitionOffer = { available: true, purchased: true, price: offerPrice, purchasedAt: Date.now() };
       state.empire.history = state.empire.history || { generation: 0, previousCharacters: [] };
       state.empire.history.generation = 1;
-      state.empire.character = createCharacter({ generation: 1 });
-      state.empire.world = { cityId: null, cityName: null, districtId: null, districtName: null, propertyId: null, setupComplete: false };
+      state.empire.character = state.empire.character || createCharacter({ generation: 1 });
+      state.empire.world = state.empire.world || { cityId: null, cityName: null, districtId: null, districtName: null, propertyId: null, setupComplete: false };
       save();
-      try {
-        renderEmpireSetup();
-      } catch (error) {
-        console.error('Empire ekranı açılamadı:', error);
-        document.body.classList.add('empire-mode');
-        document.querySelector('.hud')?.setAttribute('hidden', '');
-        document.getElementById('tabs')?.setAttribute('hidden', '');
-        document.getElementById('chatToggle')?.setAttribute('hidden', '');
-        tabContent.innerHTML = `
-          <section class="empire-setup">
-            <div class="empire-kicker">YENİ BİR HAYAT BAŞLIYOR</div>
-            <h1>Empire yüklenemedi</h1>
-            <p class="empire-error">${String(error?.message || error)}</p>
-            <button class="btn btn-green" type="button" onclick="location.reload()">Yeniden yükle</button>
-          </section>`;
-      }
+      render();
     }
     else if (a === 'hireMaster') {
       const targetSelect = document.getElementById(btn.dataset.targetSelect);
@@ -1576,7 +1560,7 @@ export function setSpeed(s) {
 
 function startInterval() {
   if (logicInterval) clearInterval(logicInterval);
-  logicInterval = setInterval(() => { if (!state.empire?.unlocked) advanceState(); }, 1000 / (state.speed || 1));
+  logicInterval = setInterval(() => { advanceState(); }, 1000 / (state.speed || 1));
 }
 
 /* ---------- INIT ---------- */
