@@ -32,6 +32,8 @@ function economy() {
   if (!e.shelters || typeof e.shelters !== 'object' || Array.isArray(e.shelters)) e.shelters = {};
   if (!Number.isInteger(e.mehmetOrderIndex)) e.mehmetOrderIndex = 0;
   if (!e.mehmetInventory || typeof e.mehmetInventory !== 'object') e.mehmetInventory = {};
+  if (!e.mehmetPendingRewards || typeof e.mehmetPendingRewards !== 'object') e.mehmetPendingRewards = {};
+  delete e.reputation;
   Object.keys(ITEMS).forEach(key => {
     if (!Number.isFinite(Number(e.mehmetInventory[key]))) e.mehmetInventory[key] = 0;
   });
@@ -113,6 +115,10 @@ function renderMehmetPage(containerId) {
     const qty = Number(e.mehmetInventory[key]) || 0;
     return `<div class="shelter-material-row"><span>${item.icon} <b>${item.name}</b></span><b>${qty} adet</b></div>`;
   }).join('');
+  const pending = Object.entries(e.mehmetPendingRewards)
+    .filter(([, qty]) => Number(qty) > 0)
+    .map(([key, qty]) => `${ITEMS[key]?.name || key}: ${qty} adet`)
+    .join(' · ');
 
   root.innerHTML = `
     <div class="section-head">
@@ -122,10 +128,11 @@ function renderMehmetPage(containerId) {
     <p class="hint">Siparişler tüm konteynerlerin için ortaktır. Bir kez tamamlaman yeterli.</p>
     ${orderHtml}
     <div class="container-card shelter-materials">
-      <h3>Mehmet Reis'ten Teslim Alınanlar</h3>
+      <h3>Mehmet Reis'in Malzemeleri</h3>
+      <p class="hint">${pending ? 'Teslim alabileceğin: ' + pending : 'Henüz teslim alınacak malzeme yok.'}</p>
+      <button class="btn btn-green" data-shelter-action="collect" data-container="${containerId}" ${pending ? '' : 'disabled'}>Malzemeleri Teslim Al</button>
+      <h3 style="margin-top:16px">Ortak Malzeme Deposu</h3>
       ${rewardHtml}
-      <p class="hint">Teslim aldığın malzemeler ortak depoya eklenir. Sığınağına dönüp yerleştirebilirsin.</p>
-      <button class="btn btn-ghost" data-shelter-action="back-shelter" data-container="${containerId}">← Sığınağa Dön</button>
     </div>`;
 }
 
@@ -158,9 +165,20 @@ function completeOrder(containerId) {
   state.stock[order.type] = Math.max(0, available - order.kg);
   state.inventory.mushroom = Math.max(0, (Number(state.inventory.mushroom) || 0) - order.kg);
   Object.entries(order.reward).forEach(([key, qty]) => {
-    e.mehmetInventory[key] = (Number(e.mehmetInventory[key]) || 0) + qty;
+    e.mehmetPendingRewards[key] = (Number(e.mehmetPendingRewards[key]) || 0) + qty;
   });
   e.mehmetOrderIndex += 1;
+  save();
+  renderMehmetPage(containerId);
+}
+
+function collectMaterials(containerId) {
+  const e = economy();
+  Object.entries(e.mehmetPendingRewards).forEach(([key, qty]) => {
+    if (!ITEMS[key]) return;
+    e.mehmetInventory[key] = (Number(e.mehmetInventory[key]) || 0) + (Number(qty) || 0);
+    e.mehmetPendingRewards[key] = 0;
+  });
   save();
   renderMehmetPage(containerId);
 }
@@ -213,8 +231,8 @@ export function initEmpireBusiness() {
     const action = button.dataset.shelterAction;
     if (action === 'create') createShelter(containerId);
     else if (action === 'visit-mehmet') renderMehmetPage(containerId);
-    else if (action === 'back-shelter') renderShelterPage(containerId);
     else if (action === 'complete-order') completeOrder(containerId);
+    else if (action === 'collect') collectMaterials(containerId);
     else if (action === 'place') placeMaterial(containerId, button.dataset.item);
   });
 }
