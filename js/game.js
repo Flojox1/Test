@@ -646,7 +646,26 @@ export function renderHUD() {
   });
 }
 
+function syncUnlockedTabs() {
+  const tabs = document.getElementById('tabs');
+  if (!tabs) return;
+  const unlocked = !!state.empire?.transitionOffer?.purchased;
+  let plotsTab = tabs.querySelector('[data-tab="arsalar"]');
+  if (unlocked && !plotsTab) {
+    plotsTab = document.createElement('button');
+    plotsTab.className = 'tab';
+    plotsTab.dataset.tab = 'arsalar';
+    plotsTab.textContent = 'Arsalar';
+    const marketTab = tabs.querySelector('[data-tab="pazar"]');
+    tabs.insertBefore(plotsTab, marketTab || null);
+  } else if (!unlocked && plotsTab) {
+    plotsTab.remove();
+    if (activeTab === 'arsalar') activeTab = 'uretim';
+  }
+}
+
 export function render() {
+  syncUnlockedTabs();
   document.body.classList.remove('empire-mode');
   document.querySelector('.hud')?.removeAttribute('hidden');
   document.getElementById('tabs')?.removeAttribute('hidden');
