@@ -3,7 +3,7 @@ import { state, save } from './core.js';
 const SHELTER_COST = 280000;
 const ORDERS = [
   { name: 'İstiridye Mantarı Siparişi', type: 'oyster', mushroom: 'İstiridye Mantarı', kg: 270 },
-  { name: 'Kral İstiridye Mantarı Siparişi', type: 'king_oyster', mushroom: 'Kral İstiridye Mantarı', kg: 300 }
+  { name: 'Kral İstiridye Mantarı Siparişi', type: 'king', mushroom: 'Kral İstiridye Mantarı', kg: 300 }
 ];
 
 function economy() {
