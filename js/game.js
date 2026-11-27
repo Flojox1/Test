@@ -41,6 +41,43 @@ let empireDistrictsFor = null;
 let empireLocationLoading = '';
 let empireLocationError = '';
 
+const plotDistrictCache = new Map();
+const plotDistrictLoading = new Set();
+async function ensurePlotDistricts(plate) {
+  plate = Number(plate);
+  if (!plate || plotDistrictCache.has(plate) || plotDistrictLoading.has(plate)) return;
+  plotDistrictLoading.add(plate);
+  try {
+    const response = await fetch(`https://api.turkiyeapi.dev/v2/districts?provinceId=${plate}&limit=1000&fields=id,name,provinceId&sort=name`, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const result = await response.json();
+    const rows = (Array.isArray(result.data) ? result.data : [])
+      .filter(item => Number(item.provinceId) === plate)
+      .sort((a,b) => a.name.localeCompare(b.name, 'tr'));
+    if (!rows.length) throw new Error('İlçe listesi bulunamadı');
+    plotDistrictCache.set(plate, rows);
+    // Önceki sürümde bu arsaya ilçe bilgisi olmadan eklenen konteynerleri,
+    // boşta kalan ilk ilçelere geriye dönük olarak bağla.
+    const unassigned = state.containers.filter(item => Number(item.plotId) === plate && item.districtId == null);
+    const occupied = new Set(state.containers.filter(item => Number(item.plotId) === plate && item.districtId != null).map(item => String(item.districtId)));
+    const free = rows.filter(item => !occupied.has(String(item.id)));
+    unassigned.forEach((container, index) => {
+      const district = free[index];
+      if (district) {
+        container.districtId = district.id;
+        container.districtName = district.name;
+      }
+    });
+    save();
+  } catch (error) {
+    console.warn('Arsa ilçeleri yüklenemedi:', error);
+    plotDistrictCache.set(plate, []);
+  } finally {
+    plotDistrictLoading.delete(plate);
+    if (Number(selectedPlate) === plate && activeTab === 'arsalar') renderArsalar();
+  }
+}
+
 async function ensureEmpireDistricts() {
   const cityId = Number(state.empire?.world?.cityId);
   if (!cityId || empireDistrictsFor === cityId || empireLocationLoading === 'districts') return;
@@ -545,18 +582,27 @@ export function doUpgrade(containerId) {
   render(); save();
 }
 
-export function buyNewContainer(plotId) {
+export function buyNewContainer(plotId, districtId = null, districtName = null) {
   const prov = getProvince(plotId);
   if (!prov || !ownsPlot(plotId)) return;
-  if (plotContainers(plotId).length >= prov.districts) {
+  if (state.empire?.unlocked && districtId == null) {
+    alert('Konteyner açmak için önce bir ilçe seçmelisin.');
+    return;
+  }
+  if (districtId != null && state.containers.some(item => Number(item.plotId) === Number(plotId) && String(item.districtId) === String(districtId))) {
+    alert('Bu ilçede zaten bir konteyner var.');
+    return;
+  }
+  if (districtId == null && plotContainers(plotId).length >= prov.districts) {
     alert(`${prov.name} arsasında en fazla ${prov.districts} konteyner açılabilir.`);
     return;
   }
   if (state.money < NEW_CONTAINER_COST) { alert('Para yetersiz.'); return; }
-  if (!confirm(`${prov.name} arsasına yeni konteyner için ${fmtMoney(NEW_CONTAINER_COST)} ödenecek.`)) return;
+  const locationText = districtName ? `${prov.name} / ${districtName}` : prov.name;
+  if (!confirm(`${locationText} için yeni konteyner açmak üzere ${fmtMoney(NEW_CONTAINER_COST)} ödenecek.`)) return;
   state.money -= NEW_CONTAINER_COST;
   const newId = Math.max(...state.containers.map(c => c.id), 0) + 1;
-  state.containers.push({ id: newId, level: 1, plotId: prov.plate });
+  state.containers.push({ id: newId, level: 1, plotId: prov.plate, ...(districtId != null ? { districtId: Number(districtId), districtName } : {}) });
   state.availableMasters.push(
     generateMaster('inoculate'), generateMaster('inoculate'),
     generateMaster('harvest'), generateMaster('harvest')
@@ -917,6 +963,23 @@ function plotPanelHtml(p) {
   const price = plotPrice(p);
   const have = plotContainers(p.plate).length;
   const canBuy = state.money >= price;
+  let districtSection = '';
+  if (state.empire?.unlocked && owned) {
+    if (!plotDistrictCache.has(p.plate) && !plotDistrictLoading.has(p.plate)) ensurePlotDistricts(p.plate);
+    const districts = plotDistrictCache.get(p.plate) || [];
+    if (plotDistrictLoading.has(p.plate) || (!districts.length && !plotDistrictCache.has(p.plate))) {
+      districtSection = '<p class="hint">İlçeler yükleniyor...</p>';
+    } else if (!districts.length) {
+      districtSection = '<p class="hint danger">Bu ilin ilçe listesi alınamadı. Sayfayı yenileyip tekrar dene.</p>';
+    } else {
+      districtSection = '<div class="district-container-list">' + districts.map(district => {
+        const container = state.containers.find(item => Number(item.plotId) === Number(p.plate) && String(item.districtId) === String(district.id));
+        return container
+          ? `<div class="district-container-row"><span><b>${district.name}</b><small>Konteyner #${container.id} açık</small></span><button class="btn btn-ghost" data-action="goDistrictContainer" data-id="${container.id}">Konteynere Git</button></div>`
+          : `<div class="district-container-row"><span><b>${district.name}</b><small>Henüz konteyner yok</small></span><button class="btn btn-green" data-action="buyDistrictContainer" data-plate="${p.plate}" data-district="${district.id}" data-district-name="${district.name}" ${state.money < NEW_CONTAINER_COST ? 'disabled' : ''}>Aç · ${tl(NEW_CONTAINER_COST)}</button></div>`;
+      }).join('') + '</div>';
+    }
+  }
   return `
     <aside class="plot-panel" id="plotPanel">
       <div class="pp-head">
@@ -927,14 +990,12 @@ function plotPanelHtml(p) {
       <div class="pp-badge ${owned ? 'owned' : ''}">${owned ? '✔ Bu arsa senin' : 'Satılık arsa'}</div>
       <div class="pp-rows">
         <div class="row"><span class="k">Arsa fiyatı</span><span class="v gold">${owned ? 'Satın alındı' : tl(price)}</span></div>
-        <div class="row"><span class="k">Açılabilecek konteyner</span><span class="v green">${p.districts}</span></div>
         <div class="row"><span class="k">İlçe sayısı</span><span class="v">${p.districts}</span></div>
         <div class="row"><span class="k">Nüfus (yaklaşık)</span><span class="v">${(p.pop * 1000).toLocaleString('tr-TR')}</span></div>
-        <div class="row"><span class="k">Konteyner maliyeti</span><span class="v">${tl(NEW_CONTAINER_COST)} / adet</span></div>
         ${owned ? `<div class="row"><span class="k">Açılan konteyner</span><span class="v green">${have}/${p.districts}</span></div>` : ''}
       </div>
       ${owned
-        ? `<button class="btn btn-green pp-btn" data-action="goPlot" data-plate="${p.plate}">Üretime Git</button>`
+        ? (state.empire?.unlocked ? `<h3>İlçeler · Her ilçeye 1 konteyner</h3>${districtSection}` : `<button class="btn btn-green pp-btn" data-action="goPlot" data-plate="${p.plate}">Üretime Git</button>`)
         : `<button class="btn btn-green pp-btn" data-action="buyPlot" data-plate="${p.plate}" ${canBuy ? '' : 'disabled'}>${canBuy ? 'Satın Al · ' : 'Para Yetersiz · '}${tl(price)}</button>`}
     </aside>
   `;
@@ -1439,6 +1500,14 @@ export function setupEvents() {
     else if (a === 'openBatch') openBatchModal(parseFloat(btn.dataset.id));
     else if (a === 'newBatchIn') openNewBatchModal(parseInt(btn.dataset.container));
     else if (a === 'buyContainer') buyNewContainer(parseInt(btn.dataset.plot));
+    else if (a === 'buyDistrictContainer') buyNewContainer(parseInt(btn.dataset.plate), btn.dataset.district, btn.dataset.districtName);
+    else if (a === 'goDistrictContainer') {
+      uretimView = 'container';
+      viewingContainerId = parseInt(btn.dataset.id);
+      activeTab = 'uretim';
+      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'uretim'));
+      render();
+    }
     else if (a === 'togglePlot') {
       const plate = parseInt(btn.dataset.plot);
       if (expandedPlots.has(plate)) expandedPlots.delete(plate); else expandedPlots.add(plate);
