@@ -41,7 +41,22 @@ function economy() {
 }
 
 function shelterFor(containerId) {
-  return economy().shelters[String(containerId)] || null;
+  const container = getContainer(containerId);
+  if (!container) return null;
+
+  // Sığınağı doğrudan konteyner kaydında tut; eski kayıtları da koruyup taşı.
+  if (container.shelter && typeof container.shelter === 'object') {
+    economy().shelters[String(containerId)] = container.shelter;
+    return container.shelter;
+  }
+
+  const legacyShelter = economy().shelters[String(containerId)];
+  if (legacyShelter && typeof legacyShelter === 'object') {
+    container.shelter = legacyShelter;
+    save();
+    return container.shelter;
+  }
+  return null;
 }
 
 function getContainer(containerId) {
@@ -142,11 +157,15 @@ function createShelter(containerId) {
     return;
   }
   state.money -= SHELTER_COST;
-  economy().shelters[String(containerId)] = {
+  const shelter = {
     containerId: Number(containerId),
     installed: {},
     openedAtDay: state.day
   };
+  // Tek kaynak: konteynerin kendi Firebase oyun kaydındaki sığınak alanı.
+  const container = getContainer(containerId);
+  container.shelter = shelter;
+  economy().shelters[String(containerId)] = shelter;
   save();
   renderShelterPage(containerId);
 }
