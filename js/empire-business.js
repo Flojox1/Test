@@ -7,22 +7,22 @@ const ORDERS = [
     type: 'oyster',
     mushroom: 'İstiridye Mantarı',
     kg: 270,
-    reward: { rack: 1, fan: 1 }
+    unlocks: ['rack', 'fan']
   },
   {
     name: 'Kral İstiridye Mantarı Siparişi',
     type: 'king',
     mushroom: 'Kral İstiridye',
     kg: 300,
-    reward: { workbench: 1, botanical: 2 }
+    unlocks: ['workbench', 'botanical']
   }
 ];
 
 const ITEMS = {
-  rack: { name: 'Yetiştirme Rafı', icon: '🗄️' },
-  fan: { name: 'Havalandırma Ünitesi', icon: '🌀' },
-  workbench: { name: 'Hazırlık Tezgâhı', icon: '🛠️' },
-  botanical: { name: 'Özel Botanik Birimi', icon: '🌱' }
+  rack: { name: 'Yetiştirme Rafı', icon: '🗄️', price: 45000, unlockOrder: 1 },
+  fan: { name: 'Havalandırma Ünitesi', icon: '🌀', price: 90000, unlockOrder: 1 },
+  workbench: { name: 'Hazırlık Tezgâhı', icon: '🛠️', price: 125000, unlockOrder: 2 },
+  botanical: { name: 'Özel Botanik Birimi', icon: '🌱', price: 18000, unlockOrder: 2 }
 };
 
 function economy() {
@@ -32,7 +32,7 @@ function economy() {
   if (!e.shelters || typeof e.shelters !== 'object' || Array.isArray(e.shelters)) e.shelters = {};
   if (!Number.isInteger(e.mehmetOrderIndex)) e.mehmetOrderIndex = 0;
   if (!e.mehmetInventory || typeof e.mehmetInventory !== 'object') e.mehmetInventory = {};
-  if (!e.mehmetPendingRewards || typeof e.mehmetPendingRewards !== 'object') e.mehmetPendingRewards = {};
+  delete e.mehmetPendingRewards;
   delete e.reputation;
   Object.keys(ITEMS).forEach(key => {
     if (!Number.isFinite(Number(e.mehmetInventory[key]))) e.mehmetInventory[key] = 0;
@@ -83,7 +83,7 @@ function renderShelterPage(containerId) {
     </div>
     <div class="container-card shelter-goto">
       <h3>Mehmet Reis</h3>
-      <p class="hint">Siparişlerini tamamla, sığınakta kullanacağın malzemeleri teslim al.</p>
+      <p class="hint">Siparişleri tamamladıkça Mehmet Reis'in malzeme kataloğu açılır. Malzemeleri parayla satın alabilirsin.</p>
       <button class="btn btn-green" data-shelter-action="visit-mehmet" data-container="${containerId}">Mehmet Reis'e Git →</button>
     </div>
     <div class="container-card shelter-materials">
@@ -107,18 +107,13 @@ function renderMehmetPage(containerId) {
         <h3>${currentOrder.name}</h3>
         <p><b>${currentOrder.kg} kg</b> ${currentOrder.mushroom} teslim etmen gerekiyor.</p>
         <p class="hint">Depoda: ${available.toFixed(1)} / ${currentOrder.kg} kg</p>
-        <button class="btn btn-green" data-shelter-action="complete-order" data-container="${containerId}" ${available < currentOrder.kg ? 'disabled' : ''}>Siparişi Teslim Et</button>
+        <div class="eb-actions">
+          <button class="btn btn-green" data-shelter-action="complete-order" data-container="${containerId}" ${available < currentOrder.kg ? 'disabled' : ''}>Depodan Teslim Et</button>
+          <button class="btn btn-ghost" data-shelter-action="bypass-order" data-container="${containerId}">Bypass</button>
+        </div>
       </article>`;
   })() : '<div class="container-card"><h3>Mehmet Reis: Şimdilik başka siparişim yok.</h3><p class="hint">Bütün mevcut siparişleri tamamladın.</p></div>';
 
-  const rewardHtml = Object.entries(ITEMS).map(([key, item]) => {
-    const qty = Number(e.mehmetInventory[key]) || 0;
-    return `<div class="shelter-material-row"><span>${item.icon} <b>${item.name}</b></span><b>${qty} adet</b></div>`;
-  }).join('');
-  const pending = Object.entries(e.mehmetPendingRewards)
-    .filter(([, qty]) => Number(qty) > 0)
-    .map(([key, qty]) => `${ITEMS[key]?.name || key}: ${qty} adet`)
-    .join(' · ');
 
   root.innerHTML = `
     <div class="section-head">
@@ -128,11 +123,15 @@ function renderMehmetPage(containerId) {
     <p class="hint">Siparişler tüm konteynerlerin için ortaktır. Bir kez tamamlaman yeterli.</p>
     ${orderHtml}
     <div class="container-card shelter-materials">
-      <h3>Mehmet Reis'in Malzemeleri</h3>
-      <p class="hint">${pending ? 'Teslim alabileceğin: ' + pending : 'Henüz teslim alınacak malzeme yok.'}</p>
-      <button class="btn btn-green" data-shelter-action="collect" data-container="${containerId}" ${pending ? '' : 'disabled'}>Malzemeleri Teslim Al</button>
-      <h3 style="margin-top:16px">Ortak Malzeme Deposu</h3>
-      ${rewardHtml}
+      <h3>Mehmet Reis'in Malzeme Kataloğu</h3>
+      ${Object.entries(ITEMS).map(([key, item]) => {
+        const unlocked = e.mehmetOrderIndex >= item.unlockOrder;
+        const owned = Number(e.mehmetInventory[key]) || 0;
+        return `<div class="shelter-material-row">
+          <span>${item.icon} <b>${item.name}</b><small>Depoda: ${owned} · Birim fiyat: ₺${item.price.toLocaleString('tr-TR')}</small></span>
+          <button class="btn btn-green" data-shelter-action="buy-material" data-container="${containerId}" data-item="${key}" ${!unlocked || state.money < item.price ? 'disabled' : ''}>${unlocked ? 'Satın Al' : 'Siparişle Açılacak'}</button>
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
@@ -152,33 +151,39 @@ function createShelter(containerId) {
   renderShelterPage(containerId);
 }
 
-function completeOrder(containerId) {
+function completeOrder(containerId, bypass = false) {
   const e = economy();
   const order = ORDERS[e.mehmetOrderIndex];
   if (!order) return;
   const available = Number(state.stock?.[order.type]) || 0;
-  if (available < order.kg) {
+  if (!bypass && available < order.kg) {
     alert('Depoda bu sipariş için yeterli türde mantar yok.');
     return;
   }
 
-  state.stock[order.type] = Math.max(0, available - order.kg);
-  state.inventory.mushroom = Math.max(0, (Number(state.inventory.mushroom) || 0) - order.kg);
-  Object.entries(order.reward).forEach(([key, qty]) => {
-    e.mehmetPendingRewards[key] = (Number(e.mehmetPendingRewards[key]) || 0) + qty;
-  });
+  if (!bypass) {
+    state.stock[order.type] = Math.max(0, available - order.kg);
+    state.inventory.mushroom = Math.max(0, (Number(state.inventory.mushroom) || 0) - order.kg);
+  }
   e.mehmetOrderIndex += 1;
   save();
   renderMehmetPage(containerId);
 }
 
-function collectMaterials(containerId) {
+function buyMaterial(containerId, itemKey) {
+  const item = ITEMS[itemKey];
+  if (!item) return;
   const e = economy();
-  Object.entries(e.mehmetPendingRewards).forEach(([key, qty]) => {
-    if (!ITEMS[key]) return;
-    e.mehmetInventory[key] = (Number(e.mehmetInventory[key]) || 0) + (Number(qty) || 0);
-    e.mehmetPendingRewards[key] = 0;
-  });
+  if (e.mehmetOrderIndex < item.unlockOrder) {
+    alert('Bu malzeme için önce gerekli siparişi tamamlamalısın.');
+    return;
+  }
+  if (state.money < item.price) {
+    alert('Bu malzemeyi almak için paran yetersiz.');
+    return;
+  }
+  state.money -= item.price;
+  e.mehmetInventory[itemKey] = (Number(e.mehmetInventory[itemKey]) || 0) + 1;
   save();
   renderMehmetPage(containerId);
 }
@@ -212,6 +217,8 @@ export function initEmpireBusiness() {
     .shelter-order h3{font:800 1rem var(--font-head);margin:8px 0}
     .shelter-order p{font-size:.78rem;line-height:1.55;margin:8px 0}
     .shelter-order .btn{width:100%;min-height:42px;margin-top:12px}
+    .shelter-order .eb-actions{display:flex;gap:8px}
+    .shelter-order .eb-actions .btn{flex:1}
     .shelter-order .btn:disabled,.shelter-material-row .btn:disabled{opacity:.45;cursor:not-allowed}
     .shelter-goto,.shelter-materials{margin-top:12px}
     .shelter-goto .btn{width:100%;margin-top:12px}
@@ -231,8 +238,9 @@ export function initEmpireBusiness() {
     const action = button.dataset.shelterAction;
     if (action === 'create') createShelter(containerId);
     else if (action === 'visit-mehmet') renderMehmetPage(containerId);
-    else if (action === 'complete-order') completeOrder(containerId);
-    else if (action === 'collect') collectMaterials(containerId);
+    else if (action === 'complete-order') completeOrder(containerId, false);
+    else if (action === 'bypass-order') completeOrder(containerId, true);
+    else if (action === 'buy-material') buyMaterial(containerId, button.dataset.item);
     else if (action === 'place') placeMaterial(containerId, button.dataset.item);
   });
 }
