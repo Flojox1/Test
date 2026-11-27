@@ -31,7 +31,7 @@ function renderShelterPage(containerId) {
     root.innerHTML = `
       <div class="section-head">
         <h2>Konteyner #${containerId} · Sığınak</h2>
-        <button class="btn btn-ghost" data-action="exitContainer">← Geri</button>
+        <button class="btn btn-ghost" data-action="exitShelter" data-container="${containerId}">← Geri</button>
       </div>
       <div class="container-card">
         <h3>Bu konteynerin sığınağı henüz açılmadı.</h3>
