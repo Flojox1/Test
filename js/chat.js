@@ -12,6 +12,8 @@ const chatStatus = document.getElementById('chatStatus');
 const chatBadge = document.getElementById('chatBadge');
 
 let chatOpen = false, unread = 0;
+export function isChatOpen(){return chatOpen;}
+export function closeChat(){if(!chatOpen)return false;chatOpen=false;chatPanel.classList.remove('open');refreshBadge();return true;}
 let myName = '';
 let firstLoad = true;
 
@@ -30,9 +32,7 @@ chatToggle.addEventListener('click', () => {
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 });
-chatClose.addEventListener('click', () => {
-  chatOpen = false; chatPanel.classList.remove('open'); refreshBadge();
-});
+chatClose.addEventListener('click', closeChat);
 
 function addMessage(msg, isSelf, messageId) {
   const empty = chatMessages.querySelector('.chat-empty');
