@@ -803,8 +803,10 @@ function renderContainerList() {
             <div class="price">${fmtMoney(NEW_CONTAINER_COST)}</div>
           </div>
         `;
+      } else if (state.empire?.unlocked) {
+        html += `<div class="hint">${prov.name} ilçelerindeki konteynerleri Arsalar sekmesinden yönetebilirsin.</div>`;
       } else {
-        html += `<div class="hint">${prov.name} arsası dolu (${prov.districts} ilçe = ${prov.districts} konteyner).</div>`;
+        html += `<div class="hint">${prov.name} arsası dolu (${conts.length}/${prov.districts}).</div>`;
       }
       html += `</div>`;
     }
