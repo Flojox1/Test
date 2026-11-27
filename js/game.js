@@ -1495,6 +1495,7 @@ export function closeModal() { modalBack.classList.remove('on'); }
 export function handleGameBack(){
   if(modalBack?.classList.contains('on')){closeModal();return true;}
   if(state.empire?.unlocked&&state.empire?.world?.setupComplete&&document.body.classList.contains('empire-mode'))return false;
+  if(activeTab==='arsalar'&&selectedPlate!=null){selectedPlate=null;renderArsalar();return true;}
   if(activeTab!=='uretim'){
     activeTab='uretim';
     document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab==='uretim'));
