@@ -1,3 +1,12 @@
+function parseAdminMoney(input){
+ const raw=String(input??'').trim().toLowerCase().replace(/\s+/g,'').replace(/₺/g,'').replace(/,/g,'.');
+ const match=raw.match(/^([0-9]+(?:\.[0-9]+)?)(mr|m|b)?$/);
+ if(!match)return NaN;
+ const value=Number(match[1]),suffix=match[2]||'';
+ const multiplier=suffix==='b'?1000:suffix==='m'?1000000:suffix==='mr'?1000000000:1;
+ const result=value*multiplier;
+ return Number.isSafeInteger(Math.round(result))?Math.round(result):NaN;
+}
 import { getFirebaseApp, getFirebaseAuth } from './firebase.js';
 const WORKER='https://email.akar4dogukan.workers.dev';
 const $=id=>document.getElementById(id);
@@ -33,7 +42,7 @@ async function loadPlayers(){
    info.append(name,meta);
    const actions=document.createElement('div');actions.className='admin-actions';
    const money=document.createElement('button');money.className='btn btn-green';money.textContent='Para ekle';
-   money.onclick=async()=>{const amount=Number(prompt('Eklenecek para miktarı:','1000'));if(!Number.isFinite(amount)||amount<=0)return;money.disabled=true;try{await api('/admin/player-action',{action:'addMoney',uid:p.uid,amount});p.money=Number(p.money||0)+amount;meta.textContent=(p.email||p.uid)+' · ₺'+Number(p.money).toLocaleString('tr-TR');money.textContent='Eklendi ✓';setTimeout(()=>{money.textContent='Para ekle';money.disabled=false;},900);}catch(e){money.disabled=false;alert(e.message);}};
+   money.onclick=async()=>{const raw=prompt('Eklenecek para miktarı (ör. 1500, 1.5b, 2.78m, 1mr):','1000');if(raw===null)return;const amount=parseAdminMoney(raw);if(!Number.isFinite(amount)||amount<=0){alert('Geçersiz miktar. Örnek: 1.5b = 1.500, 2.78m = 2.780.000, 1mr = 1.000.000.000');return;}money.disabled=true;try{await api('/admin/player-action',{action:'addMoney',uid:p.uid,amount});p.money=Number(p.money||0)+amount;meta.textContent=(p.email||p.uid)+' · ₺'+Number(p.money).toLocaleString('tr-TR');money.textContent='Eklendi ✓';setTimeout(()=>{money.textContent='Para ekle';money.disabled=false;},900);}catch(e){money.disabled=false;alert(e.message);}};
    const reset=document.createElement('button');reset.className='btn btn-ghost';reset.textContent='Sıfırla';
    reset.onclick=async()=>{if(!confirm(p.name+' oyuncusunun oyun kaydı sıfırlansın mı?'))return;try{await api('/admin/player-action',{action:'reset',uid:p.uid});await loadPlayers();}catch(e){alert(e.message);}};
    const ban=document.createElement('button');ban.className='btn admin-danger';ban.textContent='Banla';
