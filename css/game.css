@@ -796,3 +796,13 @@ body.empire-mode .chat-panel,body.empire-mode .chat-toggle { display:none!import
 }
 .password-change-status.error { color:#ff8989; }
 .password-change-form button:disabled { opacity:.55; }
+
+
+/* İlçe bazında konteyner listesi */
+.district-container-list{display:grid;gap:8px;margin:10px 0}
+.district-container-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;background:var(--surface);border:1px solid var(--border);border-radius:9px}
+.district-container-row>span{min-width:0;display:grid;gap:4px}
+.district-container-row b{font-size:.75rem}
+.district-container-row small{font-size:.62rem;color:var(--muted)}
+.district-container-row .btn{flex:0 0 auto;font-size:.62rem;padding:8px}
+@media(max-width:420px){.district-container-row{align-items:flex-start;flex-direction:column}.district-container-row .btn{width:100%}}
