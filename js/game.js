@@ -1505,7 +1505,8 @@ export function handleGameBack(){
   if(uretimView==='container'&&viewingContainerId!=null){
     uretimView='list';viewingContainerId=null;renderUretim();return true;
   }
-  return false;
+  // En üst üretim ekranında geri tuşu oyundan çıkışa yol açmamalı.
+  return true;
 }
 
 /* ---------- EVENTS ---------- */
