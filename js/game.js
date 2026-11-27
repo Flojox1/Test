@@ -796,7 +796,7 @@ function renderContainerList() {
           </div>
         `;
       });
-      if (conts.length < prov.districts) {
+      if (!state.empire?.unlocked && conts.length < prov.districts) {
         html += `
           <div class="container-list-item add" data-action="buyContainer" data-plot="${pl.id}">
             <h3>+ Yeni Konteyner</h3>
@@ -1496,6 +1496,11 @@ export function setupEvents() {
       renderUretim();
     }
     else if (a === 'openShelter') openShelterPage(parseInt(btn.dataset.container));
+    else if (a === 'exitShelter') {
+      uretimView = 'container';
+      viewingContainerId = parseInt(btn.dataset.container);
+      renderUretim();
+    }
     else if (a === 'openUpgrade') openUpgradeModal(parseInt(btn.dataset.id));
     else if (a === 'openBatch') openBatchModal(parseFloat(btn.dataset.id));
     else if (a === 'newBatchIn') openNewBatchModal(parseInt(btn.dataset.container));
@@ -1515,8 +1520,7 @@ export function setupEvents() {
     }
     else if (a === 'selectProvince') {
       if (mapDragged) { mapDragged = false; return; }   // sürükleme, tıklama değil
-      if (state.empire?.unlocked && !state.empire.world?.setupComplete) chooseEmpireCity(parseInt(btn.dataset.plate));
-      else { selectedPlate = parseInt(btn.dataset.plate); renderArsalar(); }
+      selectedPlate = parseInt(btn.dataset.plate); renderArsalar();
     }
     else if (a === 'closePanel') { selectedPlate = null; renderArsalar(); }
     else if (a === 'buyPlot') buyPlot(parseInt(btn.dataset.plate));
