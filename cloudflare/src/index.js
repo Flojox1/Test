@@ -277,7 +277,10 @@ async function handleAdminApi(request, env, pathname) {
     if (body.action === "addMoney") {
       const savePath = `users/${encodeURIComponent(uid)}/gameSave`;
       const save = await dbRequest(savePath, env) || {};
-      const newMoney = Math.max(0, Number(save.money) || 0) + Math.max(0, Math.min(100000000, Number(body.amount) || 0));
+      const amount = Number(body.amount);
+      if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 1000000000000000) return json({ error: "Para miktarı geçersiz veya izin verilen sınırı aşıyor." }, 400);
+      const newMoney = Math.max(0, Number(save.money) || 0) + amount;
+      if (!Number.isSafeInteger(Math.round(newMoney))) return json({ error: "Oyuncunun yeni para bakiyesi güvenli sayı sınırını aşıyor." }, 400);
       // Update only the balance so an active player's other save fields are not replaced.
       await dbRequest(savePath, env, "PATCH", { money: newMoney });
     } else if (body.action === "reset") {
