@@ -32,6 +32,7 @@ function economy() {
   if (!e.shelters || typeof e.shelters !== 'object' || Array.isArray(e.shelters)) e.shelters = {};
   if (!Number.isInteger(e.mehmetOrderIndex)) e.mehmetOrderIndex = 0;
   if (!e.mehmetInventory || typeof e.mehmetInventory !== 'object') e.mehmetInventory = {};
+  if (!e.mehmetCart || typeof e.mehmetCart !== 'object') e.mehmetCart = {};
   delete e.mehmetPendingRewards;
   delete e.reputation;
   Object.keys(ITEMS).forEach(key => {
@@ -91,7 +92,7 @@ function renderShelterPage(containerId) {
     return `<div class="shelter-material-row"><span>${item.icon} <b>${item.name}</b><small>Yerleştirilen: ${Number(installed[key]) || 0} · Depoda: ${owned}</small></span><button class="btn btn-green" data-shelter-action="place" data-container="${containerId}" data-item="${key}" ${owned > 0 && !blocked ? '' : 'disabled'}>Yerleştir</button></div>`;
   };
   const rackHtml = racks.map((rack, ri) => `<article class="container-card shelter-rack"><h3>🗄️ Yetiştirme Rafı #${ri + 1}</h3><div class="shelter-slots">${rack.slots.map((amount, si) => `<div class="shelter-slot"><b>Slot ${si + 1}</b><strong>🌱 ${amount}/2 Özel Botanik Birimi</strong><small>${fans > 0 ? (amount ? 'Havalandırma aktif · Büyüme başlayabilir' : 'Birim bekleniyor') : '🌀 Havalandırma ünitesi gerekli'}</small><button class="btn btn-green" data-shelter-action="place-botanical" data-container="${containerId}" data-rack="${ri}" data-slot="${si}" ${Number(inventory.botanical) > 0 && amount < 2 ? '' : 'disabled'}>Botanik Birimi Yerleştir</button></div>`).join('')}</div></article>`).join('');
-  root.innerHTML = `<div class="section-head"><h2>Konteyner #${containerId} · Sığınak</h2><button class="btn btn-ghost" data-action="exitShelter" data-container="${containerId}">← Üretime Dön</button></div><div class="container-card shelter-goto"><h3>Mehmet Reis</h3><p class="hint">Siparişleri tamamladıkça Mehmet Reis'in malzeme kataloğu açılır. Malzemeleri parayla satın alabilirsin.</p><button class="btn btn-green" data-shelter-action="visit-mehmet" data-container="${containerId}">Mehmet Reis'e Git →</button></div><div class="container-card shelter-materials"><h3>Sığınak Ekipmanları</h3>${materialRow('rack', racks.length >= 8)}${materialRow('fan')}${materialRow('workbench', installed.workbench >= 1)}<p class="hint">Raf sınırı: ${racks.length}/8 · Havalandırma: ${fans} · Hazırlık tezgâhı: ${installed.workbench}/1</p>${fans === 0 ? '<p class="shelter-warning">⚠️ En az 1 havalandırma ünitesi yerleştirilmeden botanik birimlerinde büyüme başlamaz.</p>' : '<p class="shelter-ready">✓ Havalandırma aktif. Botanik birimleri büyümeye başlayabilir.</p>'}</div><div class="container-card shelter-materials"><h3>Yetiştirme Rafları · ${racks.length}/8</h3>${racks.length ? rackHtml : '<p class="hint">Henüz raf yerleştirmedin. Her raf 2 slot açar; her slota 2 Özel Botanik Birimi koyabilirsin.</p>'}</div>`;
+  root.innerHTML = `<div class="section-head"><h2>Konteyner #${containerId} · Sığınak</h2><button class="btn btn-ghost" data-action="exitShelter" data-container="${containerId}">← Üretime Dön</button></div><div class="container-card shelter-goto"><h3>Mehmet Reis</h3><p class="hint">Siparişleri tamamladıkça Mehmet Reis'in malzeme kataloğu açılır. Malzemeleri parayla satın alabilirsin.</p><button class="btn btn-green" data-shelter-action="visit-mehmet" data-container="${containerId}">Mehmet Reis'e Git →</button></div><div class="container-card shelter-materials"><h3>Sığınak Ekipmanları</h3>${materialRow('rack', racks.length >= 8)}${materialRow('fan')}${materialRow('workbench', installed.workbench >= 1)}<p class="hint">Raf sınırı: ${racks.length}/8 · Havalandırma: ${fans} · Hazırlık tezgâhı: ${installed.workbench}/1</p>${fans === 0 ? '<p class="shelter-warning">⚠️ En az 1 havalandırma ünitesi yerleştirilmeden botanik birimlerinde büyüme başlamaz.</p>' : '<p class="shelter-ready">✓ Havalandırma aktif. Botanik birimleri büyümeye başlayabilir.</p>'}</div><div class="container-card shelter-materials"><h3>Yetiştirme Rafları · ${racks.length}/8</h3>${racks.length ? rackHtml : '<p class="hint">Henüz raf yerleştirmedin. Her raf 2 slot açar; her slota 2 Özel Botanik Birimi koyabilirsin.</p>'}<button class="btn btn-green shelter-fill-all" data-shelter-action="fill-all" data-container="${containerId}" ${fans < 1 || racks.length === 0 || Number(inventory.botanical) < 1 ? 'disabled' : ''}>Tüm Slotları Doldur</button></div>`;
 }
 function renderMehmetPage(containerId) {
   const root = document.getElementById('tabContent');
@@ -101,41 +102,13 @@ function renderMehmetPage(containerId) {
   const currentOrder = ORDERS[orderIndex];
   const orderHtml = currentOrder ? (() => {
     const available = Number(state.stock?.[currentOrder.type]) || 0;
-    const completed = orderIndex;
-    return `
-      <article class="container-card shelter-order">
-        <span class="lvl">Sipariş ${completed + 1}/${ORDERS.length}</span>
-        <h3>${currentOrder.name}</h3>
-        <p><b>${currentOrder.kg} kg</b> ${currentOrder.mushroom} teslim etmen gerekiyor.</p>
-        <p class="hint">Depoda: ${available.toFixed(1)} / ${currentOrder.kg} kg</p>
-        <div class="eb-actions">
-          <button class="btn btn-green" data-shelter-action="complete-order" data-container="${containerId}" ${available < currentOrder.kg ? 'disabled' : ''}>Depodan Teslim Et</button>
-          <button class="btn btn-ghost" data-shelter-action="bypass-order" data-container="${containerId}">Bypass</button>
-        </div>
-      </article>`;
+    return `<article class="container-card shelter-order"><span class="lvl">Sipariş ${orderIndex + 1}/${ORDERS.length}</span><h3>${currentOrder.name}</h3><p><b>${currentOrder.kg} kg</b> ${currentOrder.mushroom} teslim etmen gerekiyor.</p><p class="hint">Depoda: ${available.toFixed(1)} / ${currentOrder.kg} kg</p><div class="eb-actions"><button class="btn btn-green" data-shelter-action="complete-order" data-container="${containerId}" ${available < currentOrder.kg ? 'disabled' : ''}>Depodan Teslim Et</button><button class="btn btn-ghost" data-shelter-action="bypass-order" data-container="${containerId}">Bypass</button></div></article>`;
   })() : '<div class="container-card"><h3>Mehmet Reis: Şimdilik başka siparişim yok.</h3><p class="hint">Bütün mevcut siparişleri tamamladın.</p></div>';
-
-
-  root.innerHTML = `
-    <div class="section-head">
-      <h2>Mehmet Reis · Siparişler</h2>
-      <button class="btn btn-ghost" data-action="exitShelter" data-container="${containerId}">← Üretime Dön</button>
-    </div>
-    <p class="hint">Siparişler tüm konteynerlerin için ortaktır. Bir kez tamamlaman yeterli.</p>
-    ${orderHtml}
-    <div class="container-card shelter-materials">
-      <h3>Mehmet Reis'in Malzeme Kataloğu</h3>
-      ${Object.entries(ITEMS).map(([key, item]) => {
-        const unlocked = e.mehmetOrderIndex >= item.unlockOrder;
-        const owned = Number(e.mehmetInventory[key]) || 0;
-        return `<div class="shelter-material-row">
-          <span>${item.icon} <b>${item.name}</b><small>Depoda: ${owned} · Birim fiyat: ₺${item.price.toLocaleString('tr-TR')}</small></span>
-          <button class="btn btn-green" data-shelter-action="buy-material" data-container="${containerId}" data-item="${key}" ${!unlocked || state.money < item.price ? 'disabled' : ''}>${unlocked ? 'Satın Al' : 'Siparişle Açılacak'}</button>
-        </div>`;
-      }).join('')}
-    </div>`;
+  const cartEntries = Object.entries(e.mehmetCart).filter(([key, qty]) => ITEMS[key] && Number(qty) > 0);
+  const cartTotal = cartEntries.reduce((sum, [key, qty]) => sum + ITEMS[key].price * Number(qty), 0);
+  const cartHtml = cartEntries.length ? cartEntries.map(([key, qty]) => `<div class="shelter-material-row"><span><b>${ITEMS[key].icon} ${ITEMS[key].name}</b><small>${qty} adet × ₺${ITEMS[key].price.toLocaleString('tr-TR')} = ₺${(Number(qty) * ITEMS[key].price).toLocaleString('tr-TR')}</small></span><button class="btn btn-ghost" data-shelter-action="remove-cart" data-item="${key}">Kaldır</button></div>`).join('') : '<p class="hint">Sepetin boş.</p>';
+  root.innerHTML = `<div class="section-head"><h2>Mehmet Reis · Siparişler</h2><button class="btn btn-ghost" data-action="exitShelter" data-container="${containerId}">← Üretime Dön</button></div><p class="hint">Siparişler tüm konteynerlerin için ortaktır. Bir kez tamamlaman yeterli.</p>${orderHtml}<div class="container-card shelter-materials"><h3>Mehmet Reis'in Malzeme Kataloğu</h3>${Object.entries(ITEMS).map(([key,item]) => { const unlocked = e.mehmetOrderIndex >= item.unlockOrder; const owned = Number(e.mehmetInventory[key]) || 0; return `<div class="shelter-material-row"><span>${item.icon} <b>${item.name}</b><small>Depoda: ${owned} · Birim fiyat: ₺${item.price.toLocaleString('tr-TR')}</small></span><div class="shelter-buy-controls"><input class="shelter-qty" type="number" min="1" step="1" value="1" data-cart-qty="${key}" aria-label="${item.name} adedi"><button class="btn btn-green" data-shelter-action="add-cart" data-item="${key}" ${!unlocked ? 'disabled' : ''}>Sepete Ekle</button></div></div>`; }).join('')}</div><div class="container-card shelter-materials"><h3>🛒 Alışveriş Sepeti</h3>${cartHtml}<div class="shelter-cart-total">Toplam: ₺${cartTotal.toLocaleString('tr-TR')}</div><button class="btn btn-green shelter-checkout" data-shelter-action="checkout" data-container="${containerId}" ${!cartEntries.length || state.money < cartTotal ? 'disabled' : ''}>Sepeti Satın Al</button><p class="hint">Mevcut paran: ₺${Number(state.money).toLocaleString('tr-TR')}</p></div>`;
 }
-
 function createShelter(containerId) {
   if (!getContainer(containerId) || shelterFor(containerId)) return;
   if (state.money < SHELTER_COST) {
@@ -175,24 +148,31 @@ function completeOrder(containerId, bypass = false) {
   renderMehmetPage(containerId);
 }
 
-function buyMaterial(containerId, itemKey) {
-  const item = ITEMS[itemKey];
-  if (!item) return;
+function addToMehmetCart(itemKey) {
+  const item = ITEMS[itemKey]; if (!item) return;
+  const input = document.querySelector(`[data-cart-qty="${itemKey}"]`);
+  const qty = Math.floor(Number(input?.value));
+  if (!Number.isSafeInteger(qty) || qty < 1 || qty > 1000000) { alert('1 ile 1.000.000 arasında geçerli bir adet gir.'); return; }
   const e = economy();
-  if (e.mehmetOrderIndex < item.unlockOrder) {
-    alert('Bu malzeme için önce gerekli siparişi tamamlamalısın.');
-    return;
-  }
-  if (state.money < item.price) {
-    alert('Bu malzemeyi almak için paran yetersiz.');
-    return;
-  }
-  state.money -= item.price;
-  e.mehmetInventory[itemKey] = (Number(e.mehmetInventory[itemKey]) || 0) + 1;
+  if (e.mehmetOrderIndex < item.unlockOrder) { alert('Bu malzeme için önce gerekli siparişi tamamlamalısın.'); return; }
+  e.mehmetCart[itemKey] = Math.min(1000000, (Number(e.mehmetCart[itemKey]) || 0) + qty);
   save();
-  renderMehmetPage(containerId);
+  const containerId = Number(document.querySelector('[data-shelter-action="checkout"]')?.dataset.container || document.querySelector('[data-shelter-action="add-cart"]')?.dataset.container || 0);
+  if (containerId) renderMehmetPage(containerId);
 }
-
+function removeFromMehmetCart(itemKey, containerId) {
+  delete economy().mehmetCart[itemKey]; save(); renderMehmetPage(containerId);
+}
+function checkoutMehmetCart(containerId) {
+  const e = economy(), entries = Object.entries(e.mehmetCart).filter(([key, qty]) => ITEMS[key] && Number(qty) > 0);
+  if (!entries.length) return;
+  let total = 0;
+  for (const [key, rawQty] of entries) { const qty = Math.floor(Number(rawQty)); if (!Number.isSafeInteger(qty) || qty < 1 || e.mehmetOrderIndex < ITEMS[key].unlockOrder) { alert('Sepette geçersiz veya kilitli bir ürün var.'); return; } total += qty * ITEMS[key].price; }
+  if (!Number.isSafeInteger(total) || state.money < total) { alert('Sepet toplamı için paran yetersiz.'); return; }
+  state.money -= total;
+  entries.forEach(([key, qty]) => { e.mehmetInventory[key] = (Number(e.mehmetInventory[key]) || 0) + Number(qty); });
+  e.mehmetCart = {}; save(); renderMehmetPage(containerId);
+}
 function placeMaterial(containerId, itemKey) {
   const shelter = shelterFor(containerId);
   if (!shelter || !ITEMS[itemKey]) return;
@@ -207,6 +187,16 @@ function placeMaterial(containerId, itemKey) {
   save(); renderShelterPage(containerId);
 }
 
+function fillAllBotanicalSlots(containerId) {
+  const shelter = shelterFor(containerId); if (!shelter) return;
+  ensureShelterLayout(shelter);
+  const e = economy();
+  let remaining = Math.max(0, Math.floor(Number(e.mehmetInventory.botanical) || 0)), placed = 0;
+  if (shelter.installed.fan < 1) { alert('Önce en az 1 havalandırma ünitesi yerleştirmelisin.'); return; }
+  for (const rack of shelter.racks) { for (let i = 0; i < 2; i++) { const room = 2 - rack.slots[i], amount = Math.min(room, remaining); rack.slots[i] += amount; remaining -= amount; placed += amount; if (!remaining) break; } if (!remaining) break; }
+  if (!placed) { alert('Boş slot yok veya depoda Özel Botanik Birimi bulunmuyor.'); return; }
+  e.mehmetInventory.botanical -= placed; save(); renderShelterPage(containerId);
+}
 function placeBotanical(containerId, rackIndex, slotIndex) {
   const shelter = shelterFor(containerId);
   if (!shelter) return;
@@ -238,6 +228,7 @@ export function initEmpireBusiness() {
     .shelter-goto,.shelter-materials{margin-top:12px}
     .shelter-rack{margin-top:10px}.shelter-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:10px}.shelter-slot{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2,transparent)}.shelter-slot strong{font-size:.8rem}.shelter-slot small,.shelter-warning,.shelter-ready{font-size:.7rem;color:var(--muted)}.shelter-warning{color:#d98b32}.shelter-ready{color:#36a66a}.shelter-slot .btn{width:100%;white-space:normal}
     .shelter-goto .btn{width:100%;margin-top:12px}
+    .shelter-buy-controls{display:flex;gap:6px;align-items:center}.shelter-qty{width:76px;min-width:0;padding:9px;background:#090c08;border:1px solid var(--border);color:var(--text);border-radius:6px}.shelter-cart-total{font-weight:800;text-align:right;padding:12px 0}.shelter-checkout,.shelter-fill-all{width:100%;margin-top:10px}
     .shelter-material-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
     .shelter-material-row:last-child{border-bottom:0}
     .shelter-material-row>span{display:grid;gap:4px;font-size:.78rem}
@@ -257,6 +248,10 @@ export function initEmpireBusiness() {
     else if (action === 'complete-order') completeOrder(containerId, false);
     else if (action === 'bypass-order') completeOrder(containerId, true);
     else if (action === 'buy-material') buyMaterial(containerId, button.dataset.item);
+    else if (action === 'add-cart') addToMehmetCart(button.dataset.item, containerId);
+    else if (action === 'remove-cart') removeFromMehmetCart(button.dataset.item, containerId);
+    else if (action === 'checkout') checkoutMehmetCart(containerId);
+    else if (action === 'fill-all') fillAllBotanicalSlots(containerId);
     else if (action === 'place') placeMaterial(containerId, button.dataset.item);
     else if (action === 'place-botanical') placeBotanical(containerId, button.dataset.rack, button.dataset.slot);
   });
