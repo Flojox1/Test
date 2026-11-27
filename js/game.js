@@ -1505,7 +1505,6 @@ export function handleGameBack(){
   if(uretimView==='container'&&viewingContainerId!=null){
     uretimView='list';viewingContainerId=null;renderUretim();return true;
   }
-  if(selectedPlate!=null){selectedPlate=null;renderArsalar();return true;}
   return false;
 }
 
