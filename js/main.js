@@ -1,7 +1,7 @@
 import { requireVerifiedUser, changeAccountPassword } from './auth.js';
-import { init, closeModal } from './game.js';
+import { init, closeModal, handleGameBack } from './game.js';
 import { isChatOpen, closeChat } from './chat.js';
-import { initEmpireBusiness } from './empire-business.js';
+import { initEmpireBusiness, handleShelterBack } from './empire-business.js';
 import { getFirebaseApp, getFirebaseAuth } from './firebase.js';
 
 function choosePlayerName() {
@@ -121,8 +121,8 @@ try {
 
     await init(user.uid);
     initEmpireBusiness();
-    history.replaceState({floRodApp:true},'',location.href); history.pushState({floRodApp:true},'',location.href);
-    window.addEventListener('popstate',()=>{const p=document.getElementById('profileBack');if(isChatOpen())closeChat();else if(p?.classList.contains('open')){p.classList.remove('open');p.setAttribute('aria-hidden','true');}else if(document.getElementById('modalBack')?.classList.contains('on'))closeModal();history.pushState({floRodApp:true},'',location.href);});
+    history.replaceState({floRodApp:true,level:0},'',location.href); history.pushState({floRodApp:true,level:1},'',location.href);
+    window.addEventListener('popstate',()=>{const p=document.getElementById('profileBack');if(isChatOpen())closeChat();else if(p?.classList.contains('open')){p.classList.remove('open');p.setAttribute('aria-hidden','true');}else if(document.getElementById('modalBack')?.classList.contains('on'))closeModal();else if(!handleShelterBack())handleGameBack();history.pushState({floRodApp:true,level:1},'',location.href);});
   }
 } catch (error) {
   console.error('Oyun başlatılamadı:', error);
