@@ -25,7 +25,7 @@ import { START_PLOT, getProvince, plotPrice } from './plots.js';
 import { initChat } from './chat.js';
 import { getFirebaseApp } from './firebase.js';
 import { createCharacter } from './empire.js';
-import { openShelterPage } from './empire-business.js';
+import { openShelterPage, advanceShelterGrowth } from './empire-business.js';
 
 let activeTab = 'uretim';
 let logicInterval = null;
@@ -257,6 +257,7 @@ export function advanceState() {
   if (state.tickCount % 12 === 0) state.day++;
 
   if (state.day !== prevDay) {
+    advanceShelterGrowth();
     let salary = 0;
     state.masters.forEach(m => salary += m.salary);
     if (salary > 0) state.money -= salary;
